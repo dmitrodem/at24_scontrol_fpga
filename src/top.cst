@@ -1,0 +1,52 @@
+IO_LOC "clk"           E2;
+IO_LOC "rst"           H11;
+IO_LOC "uart_rx"       B3;
+IO_LOC "uart_tx"       C3;
+IO_LOC "ready"         E8;
+IO_LOC "done"          D7;
+
+// Left column
+IO_LOC "I_STOP_K"      K1;
+IO_LOC "I_ERR_U"       L2;
+IO_LOC "I_ERR_DR_2"    J4;
+IO_LOC "I_ERR_DR_1"    G2;
+IO_LOC "O_BOT_4"       L4;
+// Pin 12 - No connection
+IO_LOC "O_BOT_2"       B2;
+IO_LOC "O_BOT_3"       F2;
+IO_LOC "O_BOT_1"       E1;
+IO_LOC "O_AVI"         E3;
+IO_LOC "O_TD"          J1;
+IO_LOC "O_ERBD2"       G4;
+IO_LOC "O_ERBD4"       H1;
+IO_LOC "O_BREAK"       K7;
+IO_LOC "O_MINUS"       L7;
+IO_LOC "O_PAUSE_N"     L10;
+IO_LOC "O_CHARGE"      L9;
+IO_LOC "O_CH"          J8;
+IO_LOC "I_C1"          F7;
+IO_LOC "I_CLK"        J11;
+
+// Right column signals
+IO_LOC "O_FAN"         K2;
+IO_LOC "I_ERR_I"       L1;
+IO_LOC "I_ERR_DR_4"    K4;
+IO_LOC "I_ERR_DR_3"    G1;
+IO_LOC "O_TOP_4"       L3;
+// Pin 11 - +5V
+IO_LOC "O_TOP_2"       C2;
+IO_LOC "O_TOP_3"       F1;
+IO_LOC "O_TOP_1"       A1;
+IO_LOC "O_AVV"         D1;
+IO_LOC "O_ERBD1"       J2;
+IO_LOC "O_ERBD3"       H4;
+IO_LOC "O_STOP"        H2;
+IO_LOC "O_PLUS"        J7;
+IO_LOC "O_PAUSE_P"     L8;
+IO_LOC "O_START"       K10;
+IO_LOC "I_BT"          K9;
+IO_LOC "O_ST"          K8;
+IO_LOC "I_C0"          F6;
+IO_LOC "I_C2"          J10;
+
+IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=DOWN BANK_VCCIO=3.3;
