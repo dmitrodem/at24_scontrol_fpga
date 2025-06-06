@@ -10,7 +10,7 @@ module filter #(
   reg [WIDTH-1:0] r = {WIDTH{1'b0}};
   reg             v = 1'b0;
 
-  always @(posedge clk or posedge rstn) begin
+  always @(posedge clk or negedge rstn) begin
     if (~rstn) begin
       r <= {WIDTH{1'b0}};
       v <= 1'b0;
