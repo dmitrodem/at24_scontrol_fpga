@@ -1,12 +1,13 @@
 `default_nettype none
-module top (
-
+module top #(
+  parameter FREQ = 50000000
+) (
   input wire  clk,        // E2
   input wire  rst,        // H11
-  input wire  uart_rx,    // B3
-  output wire uart_tx,    // C3
-  output wire ready,      // E8
-  output wire done,       // D7
+  // input wire  uart_rx,    // B3
+  // output wire uart_tx,    // C3
+  // output wire ready,      // E8
+  // output wire done,       // D7
 
   // First group from IO_LOC
   input wire  I_STOP_K,   // Pin 2 (K1)
@@ -53,82 +54,354 @@ module top (
   input wire  I_C2        // Pin 39 (J10)
 );
 
-  assign O_BOT_1 = 1'b0;
-  assign O_BOT_2 = 1'b0;
-  assign O_BOT_3 = 1'b0;
-  assign O_BOT_4 = 1'b0;
+  wire rstn;
+  wire w_clk;
+  wire [2:0] w_bus;
+  wire [4:1] w_err_dr;
+  wire       w_err_u;
+  wire       w_err_i;
+  wire       w_bt;
+  wire       w_stop_k;
 
-  assign O_TOP_1 = 1'b0;
-  assign O_TOP_2 = 1'b0;
-  assign O_TOP_3 = 1'b0;
-  assign O_TOP_4 = 1'b0;
+  assign rstn = ~rst;
 
-  assign O_AVI = 1'b0;
-  assign O_AVV = 1'b0;
-  assign O_TD = 1'b0;
+  filter #(.WIDTH(16)) u_clk (.clk (clk), .rstn(rstn), .i(I_CLK), .o(w_clk));
+  filter #(.WIDTH(16)) u_c0 (.clk (clk), .rstn(rstn), .i(I_C0), .o(w_bus[0]));
+  filter #(.WIDTH(16)) u_c1 (.clk (clk), .rstn(rstn), .i(I_C1), .o(w_bus[1]));
+  filter #(.WIDTH(16)) u_c2 (.clk (clk), .rstn(rstn), .i(I_C2), .o(w_bus[2]));
+  filter #(.WIDTH(16)) u_err_dr1 (.clk (clk), .rstn(rstn), .i(I_ERR_DR_1), .o(w_err_dr[1]));
+  filter #(.WIDTH(16)) u_err_dr2 (.clk (clk), .rstn(rstn), .i(I_ERR_DR_2), .o(w_err_dr[2]));
+  filter #(.WIDTH(16)) u_err_dr3 (.clk (clk), .rstn(rstn), .i(I_ERR_DR_3), .o(w_err_dr[3]));
+  filter #(.WIDTH(16)) u_err_dr4 (.clk (clk), .rstn(rstn), .i(I_ERR_DR_4), .o(w_err_dr[4]));
+  filter #(.WIDTH(16)) u_err_u (.clk (clk), .rstn(rstn), .i(I_ERR_U), .o(w_err_u));
+  filter #(.WIDTH(16)) u_err_i (.clk (clk), .rstn(rstn), .i(I_ERR_I), .o(w_err_i));
+  filter #(.WIDTH(16)) u_bt (.clk (clk), .rstn(rstn), .i(I_BT), .o(w_bt));
+  filter #(.WIDTH(16)) u_stop_k (.clk (clk), .rstn(rstn), .i(I_STOP_K), .o(w_stop_k));
 
-  assign O_ERBD1 = 1'b0;
-  assign O_ERBD2 = 1'b0;
-  assign O_ERBD3 = 1'b0;
-  assign O_ERBD4 = 1'b0;
+  typedef enum bit [1:0] {
+    START_IDLE    = 0,
+    START_WAIT15S = 1,
+    START_WAIT1S  = 2
+  } start_state_t;
 
-  assign O_BREAK = 1'b0;
-  assign O_MINUS = 1'b0;
-  assign O_PLUS  = 1'b0;
-  assign O_PAUSE_P = 1'b0;
-  assign O_PAUSE_N = 1'b0;
-  assign O_CHARGE = 1'b0;
-  assign O_CH = 1'b0;
-
-  // assign O_FAN = 1'b0;
-  assign O_STOP = 1'b0;
-  assign O_START = 1'b0;
-  assign O_ST = 1'b0;
+  typedef enum bit [3:0] {
+    ST_IDLE           = 0,
+    ST_CMD_PAUSE      = 1,
+    ST_CMD_PLUS       = 2,
+    ST_CMD_MINUS      = 3,
+    ST_CMD_BALLAST_P  = 4,
+    ST_CMD_BALLAST_N  = 5,
+    ST_CMD_START      = 6,
+    ST_CMD_SHUTDOWN   = 7,
+    ST_CMD_DISCHARGE0 = 8,
+    ST_CMD_DISCHARGE1 = 9,
+    ST_CMD_DISCHARGE2 = 10,
+    ST_CMD_DISCHARGE3 = 11,
+    ST_ERROR          = 12
+  } rx_cmd_state_t;
 
   typedef struct packed {
-    bit [12:0] baud_cnt;
-    bit [20:0] shiftreg;
-    bit [25:0] cnt;
+    bit w_clk;
+    rx_cmd_state_t rx_state;
+    start_state_t  start_state;
+    bit [4:1] o_top;
+    bit [4:1] o_bot;
+    bit       o_st;
+    bit       o_ch;
+    bit       o_fan;
+    bit       o_break;
+    bit       o_avi;
+    bit       o_avv;
+    bit       o_td;
+    bit [4:1] o_erbd;
+    bit       o_plus;
+    bit       o_minus;
+    bit       o_pause_p;
+    bit       o_pause_n;
+    bit       o_stop;
+    bit [31:0] timer;
   } state_t;
 
   localparam     state_t RES_state = '{
-    baud_cnt : 'd0,
-    shiftreg: {1'b0, 8'h68, {12{1'b1}}},
-    cnt: 'd0
+    w_clk: 1'b0,
+    rx_state: ST_IDLE,
+    start_state: START_IDLE,
+    o_top: 4'b0000,
+    o_bot: 4'b0000,
+    o_st: 1'b0,
+    o_ch: 1'b0,
+    o_fan: 1'b0,
+    o_break: 1'b0,
+    o_avi: 1'b0,
+    o_avv: 1'b0,
+    o_td: 1'b0,
+    o_erbd: 4'b0000,
+    o_plus: 1'b0,
+    o_minus: 1'b0,
+    o_pause_p: 1'b0,
+    o_pause_n: 1'b0,
+    o_stop: 1'b0,
+    timer: 32'h00000000
   };
 
-  state_t r = RES_state;
+  localparam     TIMEOUT_15S = FREQ * 15;
+  localparam     TIMEOUT_1S = FREQ * 1;
+
+  state_t r                  = RES_state;
   state_t rin;
 
   always_comb begin
-    state_t v = r;
-    bit tick = 1'b0;
+    automatic state_t v = r;
+    automatic bit is_start;
 
-    if (r.baud_cnt < 'd5208) begin
-      v.baud_cnt = r.baud_cnt + 1;
-    end else begin
-      v.baud_cnt = 'd0;
-      tick = 1'b1;
+    v.w_clk = w_clk;
+
+    if (r.timer > 0) begin
+      v.timer = r.timer - 1;
     end
 
-    if (tick)
-      v.shiftreg = {r.shiftreg[19:0], r.shiftreg[20]};
+    is_start = (r.start_state != START_IDLE);
+    case (r.start_state)
+      START_IDLE:;
+      START_WAIT15S: begin
+        if (r.timer == 32'h00000000) begin
+          v.o_st        = 1'b1;
+          v.timer         = TIMEOUT_1S;
+          v.start_state = START_WAIT1S;
+        end
+      end
+      START_WAIT1S: begin
+        if (r.timer == 32'h00000000) begin
+          v.o_ch        = 1'b0;
+          v.start_state = START_IDLE;
+        end
+      end
+      default:;
+    endcase
 
-    v.cnt = r.cnt + 1;
+    if ({r.w_clk, w_clk} == 2'b10) begin
+      case (r.rx_state)
+        ST_IDLE: begin
+          case (w_bus)
+            3'h0: begin
+              v.rx_state = is_start ? ST_IDLE : ST_CMD_PAUSE;
+            end
+            3'h1: begin
+              v.rx_state = is_start ? ST_IDLE : ST_CMD_PLUS;
+            end
+            3'h2: begin
+              v.rx_state = is_start ? ST_IDLE : ST_CMD_MINUS;
+            end
+            3'h3: begin
+              v.rx_state = is_start ? ST_IDLE : ST_CMD_BALLAST_P;
+            end
+            3'h4: begin
+              v.rx_state = is_start ? ST_IDLE : ST_CMD_BALLAST_N;
+            end
+            3'h5: begin
+              v.rx_state = is_start ? ST_IDLE : ST_CMD_START;
+            end
+            3'h6: begin
+              v.start_state = START_IDLE;
+              v.timer       = 32'h00000000;
+              v.rx_state    = ST_CMD_SHUTDOWN;
+            end
+            3'h7: begin
+              v.rx_state = is_start ? ST_IDLE : ST_CMD_DISCHARGE0;
+            end
+            default: begin
+              v.rx_state = ST_IDLE;
+            end
+          endcase
+        end // case: ST_IDLE
+        ST_CMD_PAUSE: begin
+          if (w_bus == 3'h0) begin
+            v.o_top     = 4'b0000;
+            v.o_bot     = 4'b0000;
+            v.o_plus    = 1'b0;
+            v.o_minus   = 1'b0;
+            v.o_pause_p = 1'b0;
+            v.o_pause_n = 1'b0;
+          end
+          v.rx_state = ST_IDLE;
+        end // case: ST_CMD_PAUSE
+        ST_CMD_PLUS: begin
+          if (w_bus == 3'h0) begin
+            if ((r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+              v.o_top     = 4'b0001; // O.TOP1 в HIGH
+              v.o_bot     = 4'b0010; // O.BOT2 в HIGH
+              v.o_plus    = 1'b1;
+              v.o_minus   = 1'b0;
+              v.o_pause_p = 1'b0;
+              v.o_pause_n = 1'b0;
+            end
+          end
+          v.rx_state = ST_IDLE;
+        end // case: ST_CMD_PLUS
+        ST_CMD_MINUS: begin
+          if (w_bus == 3'h0) begin
+            if ((r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+              // O.TOP2 в HIGH, O.BOT1 в HIGH, все остальные O.TOP и O.BOT в LOW
+              v.o_top     = 4'b0010;
+              v.o_bot     = 4'b0001;
+              v.o_plus    = 1'b0;
+              v.o_minus   = 1'b1;
+              v.o_pause_p = 1'b0;
+              v.o_pause_n = 1'b0;
+            end
+          end
+          v.rx_state = ST_IDLE;
+        end // case: ST_CMD_MINUS
+        ST_CMD_BALLAST_P: begin
+          if (w_bus == 3'h0) begin
+            if ((r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+              // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
+              v.o_top     = 4'b0100;
+              v.o_bot     = 4'b1000;
+              v.o_plus    = 1'b0;
+              v.o_minus   = 1'b0;
+              v.o_pause_p = 1'b1;
+              v.o_pause_n = 1'b0;
+            end
+          end
+          v.rx_state = ST_IDLE;
+        end // case: ST_CMD_BALLAST_P
+        ST_CMD_BALLAST_N: begin
+          if (w_bus == 3'h0) begin
+            if ((r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+              // O.TOP4 в HIGH, O.BOT3 в HIGH, все остальные O.TOP и O.BOT в LOW
+              v.o_top     = 4'b1000;
+              v.o_bot     = 4'b0100;
+              v.o_plus    = 1'b0;
+              v.o_minus   = 1'b0;
+              v.o_pause_p = 1'b0;
+              v.o_pause_n = 1'b1;
+            end
+          end
+          v.rx_state = ST_IDLE;
+        end // case: ST_CMD_BALLAST_N
+        ST_CMD_START: begin
+          if (w_bus == 3'h0) begin
+            v.o_top       = 4'b0000;
+            v.o_bot       = 4'b0000;
+            v.o_plus      = 1'b0;
+            v.o_minus     = 1'b0;
+            v.o_pause_p   = 1'b0;
+            v.o_pause_n   = 1'b0;
+            // O.FAN  в HIGH, O.ST в LOW, O.СH в HIGH
+            v.o_fan       = 1'b1;
+            v.o_st        = 1'b0;
+            v.o_ch        = 1'b1;
+            v.start_state = START_WAIT15S;
+            v.timer       = TIMEOUT_15S;
+          end
+          v.rx_state    = ST_IDLE;
+        end // case: ST_CMD_START
+        ST_CMD_SHUTDOWN: begin
+          if (w_bus == 3'h0) begin
+            // O.ST в LOW, O.СH в LOW, O.BOT1-4 и O.TOP1-4 в LOW, O.FAN  в LOW
+            v.o_top     = 4'b0000;
+            v.o_bot     = 4'b0000;
+            v.o_plus    = 1'b0;
+            v.o_minus   = 1'b0;
+            v.o_pause_p = 1'b0;
+            v.o_pause_n = 1'b0;
+            v.o_st      = 1'b0;
+            v.o_ch      = 1'b0;
+            v.o_fan     = 1'b0;
+          end
+          v.rx_state  = ST_IDLE;
+        end // case: ST_CMD_SHUTDOWN
+        ST_CMD_DISCHARGE0: begin
+          v.rx_state = (w_bus == 3'h0) ? ST_CMD_DISCHARGE1 : ST_IDLE;
+        end
+        ST_CMD_DISCHARGE1: begin
+          v.rx_state = (w_bus == 3'h7) ? ST_CMD_DISCHARGE2 : ST_IDLE;
+        end
+        ST_CMD_DISCHARGE2: begin
+          v.rx_state = (w_bus == 3'h0) ? ST_CMD_DISCHARGE3 : ST_IDLE;
+        end
+        ST_CMD_DISCHARGE3: begin
+          if (w_bus == 3'h1) begin
+            if ((r.o_st == 1'b0) && (r.o_ch == 1'b0)) begin
+              // O.TOP1 в HIGH, O.BOT2 в HIGH, все остальные O.TOP и O.BOT в LOW
+              v.o_top     = 4'b0001;
+              v.o_bot     = 4'b0010;
+              v.o_plus    = 1'b1;
+              v.o_minus   = 1'b0;
+              v.o_pause_p = 1'b0;
+              v.o_pause_n = 1'b0;
+            end
+          end
+          v.rx_state = ST_IDLE;
+        end // case: ST_CMD_DISCHARGE3
+        ST_ERROR:;
+        default:;
+      endcase
+    end
 
-    // if (rst)
-    //   v = RES_state;
+    // I.ERR_DR_1-4, I.ERR_U, I.ERR_I, I.BT, I.STOP_K
+    if (|{w_err_dr[4:1], w_err_u, w_err_i, w_bt, w_stop_k}) begin
+      // O.FAN в HIGH, O.BOT1-4 и O.TOP1-4 в LOW, O.ST в LOW, O.СH в LOW
+      v.o_fan     = 1'b1;
+      v.o_bot     = 4'b0000;
+      v.o_top     = 4'b0000;
+      v.o_st      = 1'b0;
+      v.o_ch      = 1'b0;
+      v.o_break   = 1'b1;
+      v.o_plus    = 1'b0;
+      v.o_minus   = 1'b0;
+      v.o_pause_p = 1'b0;
+      v.o_pause_n = 1'b0;
+      v.rx_state  = ST_ERROR;
+    end
+
+    if (w_stop_k) begin
+      v.o_stop = 1'b1;
+    end
 
     rin = v;
   end
 
-  always_ff @(posedge clk)
-    r <= rin;
+  always_ff @(posedge clk or negedge rstn) begin
+    if (~rstn) begin
+      r <= RES_state;
+    end else begin
+      r <= rin;
+    end
+  end
 
-  assign uart_tx = r.shiftreg[0];
+  assign O_BOT_1   = r.o_bot[1];
+  assign O_BOT_2   = r.o_bot[2];
+  assign O_BOT_3   = r.o_bot[3];
+  assign O_BOT_4   = r.o_bot[4];
 
-  assign O_FAN = r.shiftreg[0];
-  assign done = r.shiftreg[0];
-  assign ready = r.cnt[25];
+  assign O_TOP_1   = r.o_top[1];
+  assign O_TOP_2   = r.o_top[2];
+  assign O_TOP_3   = r.o_top[3];
+  assign O_TOP_4   = r.o_top[4];
+
+  assign O_AVI     = w_err_i;
+  assign O_AVV     = w_err_u;
+  assign O_TD      = w_bt;
+
+  assign O_ERBD1   = w_err_dr[1];
+  assign O_ERBD2   = w_err_dr[2];
+  assign O_ERBD3   = w_err_dr[3];
+  assign O_ERBD4   = w_err_dr[4];
+
+  assign O_BREAK   = r.o_break;
+  assign O_MINUS   = r.o_minus;
+  assign O_PLUS    = r.o_plus;
+  assign O_PAUSE_P = r.o_pause_p;
+  assign O_PAUSE_N = r.o_pause_n;
+  assign O_CHARGE  = r.o_ch;
+  assign O_CH      = r.o_ch;
+
+  assign O_FAN     = r.o_fan;
+  assign O_STOP    = r.o_stop;
+  assign O_START   = r.o_st;
+  assign O_ST      = r.o_st;
+
 endmodule
 `default_nettype wire

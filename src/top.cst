@@ -1,9 +1,9 @@
 IO_LOC "clk"           E2;
 IO_LOC "rst"           H11;
-IO_LOC "uart_rx"       B3;
-IO_LOC "uart_tx"       C3;
-IO_LOC "ready"         E8;
-IO_LOC "done"          D7;
+//IO_LOC "uart_rx"       B3;
+//IO_LOC "uart_tx"       C3;
+//IO_LOC "ready"         E8;
+//IO_LOC "done"          D7;
 
 // Left column
 IO_LOC "I_STOP_K"      K1;
