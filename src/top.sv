@@ -6,8 +6,8 @@ module top #(
   input wire  rst,        // H11
   // input wire  uart_rx,    // B3
   // output wire uart_tx,    // C3
-  // output wire ready,      // E8
-  // output wire done,       // D7
+  output wire led_ready,  // E8
+  output wire led_done,   // D7
 
   // First group from IO_LOC
   input wire  I_STOP_K,   // Pin 2 (K1)
@@ -120,6 +120,8 @@ module top #(
     bit       o_pause_n;
     bit       o_stop;
     bit [31:0] timer;
+    bit [31:0] led_timer;
+    bit        led_ready;
   } state_t;
 
   localparam     state_t RES_state = '{
@@ -141,11 +143,16 @@ module top #(
     o_pause_p: 1'b0,
     o_pause_n: 1'b0,
     o_stop: 1'b0,
-    timer: 32'h00000000
+    timer: 32'h00000000,
+    led_timer: 32'h00000000,
+    led_ready: 1'b0
   };
 
   localparam     TIMEOUT_15S = FREQ * 15;
-  localparam     TIMEOUT_1S = FREQ * 1;
+  localparam     TIMEOUT_1S  = FREQ * 1;
+
+  localparam     LED_NORMAL  = FREQ;
+  localparam     LED_ERROR   = FREQ/8;
 
   state_t r                  = RES_state;
   state_t rin;
@@ -155,6 +162,13 @@ module top #(
     automatic bit is_start;
 
     v.w_clk = w_clk;
+
+    if (r.led_timer > 0) begin
+      v.led_timer = r.led_timer - 1;
+    end else begin
+      v.led_ready = ~r.led_ready;
+      v.led_timer = (r.rx_state == ST_ERROR) ? LED_ERROR : LED_NORMAL;
+    end
 
     if (r.timer > 0) begin
       v.timer = r.timer - 1;
@@ -166,7 +180,7 @@ module top #(
       START_WAIT15S: begin
         if (r.timer == 32'h00000000) begin
           v.o_st        = 1'b1;
-          v.timer         = TIMEOUT_1S;
+          v.timer       = TIMEOUT_1S;
           v.start_state = START_WAIT1S;
         end
       end
@@ -212,7 +226,7 @@ module top #(
             default: begin
               v.rx_state = ST_IDLE;
             end
-          endcase
+          endcase // case (w_bus)
         end // case: ST_IDLE
         ST_CMD_PAUSE: begin
           if (w_bus == 3'h0) begin
@@ -402,6 +416,9 @@ module top #(
   assign O_STOP    = r.o_stop;
   assign O_START   = r.o_st;
   assign O_ST      = r.o_st;
+
+  assign led_ready = r.led_ready;
+  assign led_done  = (r.rx_state == ST_IDLE);
 
 endmodule
 `default_nettype wire
