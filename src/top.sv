@@ -69,14 +69,14 @@ module top #(
   filter #(.WIDTH(16)) u_c0 (.clk (clk), .rstn(rstn), .i(I_C0), .o(w_bus[0]));
   filter #(.WIDTH(16)) u_c1 (.clk (clk), .rstn(rstn), .i(I_C1), .o(w_bus[1]));
   filter #(.WIDTH(16)) u_c2 (.clk (clk), .rstn(rstn), .i(I_C2), .o(w_bus[2]));
-  filter #(.WIDTH(16)) u_err_dr1 (.clk (clk), .rstn(rstn), .i(I_ERR_DR_1), .o(w_err_dr[1]));
-  filter #(.WIDTH(16)) u_err_dr2 (.clk (clk), .rstn(rstn), .i(I_ERR_DR_2), .o(w_err_dr[2]));
-  filter #(.WIDTH(16)) u_err_dr3 (.clk (clk), .rstn(rstn), .i(I_ERR_DR_3), .o(w_err_dr[3]));
-  filter #(.WIDTH(16)) u_err_dr4 (.clk (clk), .rstn(rstn), .i(I_ERR_DR_4), .o(w_err_dr[4]));
+  filter #(.WIDTH(16)) u_err_dr1 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_1), .o(w_err_dr[1]));
+  filter #(.WIDTH(16)) u_err_dr2 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_2), .o(w_err_dr[2]));
+  filter #(.WIDTH(16)) u_err_dr3 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_3), .o(w_err_dr[3]));
+  filter #(.WIDTH(16)) u_err_dr4 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_4), .o(w_err_dr[4]));
   filter #(.WIDTH(16)) u_err_u (.clk (clk), .rstn(rstn), .i(I_ERR_U), .o(w_err_u));
   filter #(.WIDTH(16)) u_err_i (.clk (clk), .rstn(rstn), .i(I_ERR_I), .o(w_err_i));
-  filter #(.WIDTH(16)) u_bt (.clk (clk), .rstn(rstn), .i(I_BT), .o(w_bt));
-  filter #(.WIDTH(16)) u_stop_k (.clk (clk), .rstn(rstn), .i(I_STOP_K), .o(w_stop_k));
+  filter #(.WIDTH(16)) u_bt (.clk (clk), .rstn(rstn), .i(~I_BT), .o(w_bt));
+  filter #(.WIDTH(16)) u_stop_k (.clk (clk), .rstn(rstn), .i(~I_STOP_K), .o(w_stop_k));
 
   typedef enum bit [1:0] {
     START_IDLE    = 0,
