@@ -84,20 +84,15 @@ module top #(
     START_WAIT1S  = 2
   } start_state_t;
 
-  typedef enum bit [3:0] {
+  typedef enum bit [2:0] {
     ST_IDLE           = 0,
     ST_CMD_PAUSE      = 1,
-    ST_CMD_PLUS       = 2,
-    ST_CMD_MINUS      = 3,
-    ST_CMD_BALLAST_P  = 4,
-    ST_CMD_BALLAST_N  = 5,
-    ST_CMD_START      = 6,
-    ST_CMD_SHUTDOWN   = 7,
-    ST_CMD_DISCHARGE0 = 8,
-    ST_CMD_DISCHARGE1 = 9,
-    ST_CMD_DISCHARGE2 = 10,
-    ST_CMD_DISCHARGE3 = 11,
-    ST_ERROR          = 12
+    ST_CMD_START      = 2,
+    ST_CMD_DISCHARGE0 = 3,
+    ST_CMD_DISCHARGE1 = 4,
+    ST_CMD_DISCHARGE2 = 5,
+    ST_CMD_DISCHARGE3 = 6,
+    ST_ERROR          = 7
   } rx_cmd_state_t;
 
   typedef struct packed {
@@ -200,25 +195,70 @@ module top #(
             3'h0: begin
               v.rx_state = is_start ? ST_IDLE : ST_CMD_PAUSE;
             end
-            3'h1: begin
-              v.rx_state = is_start ? ST_IDLE : ST_CMD_PLUS;
+            3'h1: begin // ST_CMD_PLUS
+              if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+                v.o_top     = 4'b0001; // O.TOP1 в HIGH
+                v.o_bot     = 4'b0010; // O.BOT2 в HIGH
+                v.o_plus    = 1'b1;
+                v.o_minus   = 1'b0;
+                v.o_pause_p = 1'b0;
+                v.o_pause_n = 1'b0;
+              end
+              v.rx_state = ST_IDLE;
             end
-            3'h2: begin
-              v.rx_state = is_start ? ST_IDLE : ST_CMD_MINUS;
+            3'h2: begin // ST_CMD_MINUS
+              if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+                // O.TOP2 в HIGH, O.BOT1 в HIGH, все остальные O.TOP и O.BOT в LOW
+                v.o_top     = 4'b0010;
+                v.o_bot     = 4'b0001;
+                v.o_plus    = 1'b0;
+                v.o_minus   = 1'b1;
+                v.o_pause_p = 1'b0;
+                v.o_pause_n = 1'b0;
+              end
+              v.rx_state = ST_IDLE;
             end
-            3'h3: begin
-              v.rx_state = is_start ? ST_IDLE : ST_CMD_BALLAST_P;
+            3'h3: begin // ST_CMD_BALLAST_P
+              if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+                // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
+                v.o_top     = 4'b0100;
+                v.o_bot     = 4'b1000;
+                v.o_plus    = 1'b0;
+                v.o_minus   = 1'b0;
+                v.o_pause_p = 1'b1;
+                v.o_pause_n = 1'b0;
+              end
+              v.rx_state = ST_IDLE;
             end
-            3'h4: begin
-              v.rx_state = is_start ? ST_IDLE : ST_CMD_BALLAST_N;
+            3'h4: begin // ST_CMD_BALLAST_N
+              if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+                // O.TOP4 в HIGH, O.BOT3 в HIGH, все остальные O.TOP и O.BOT в LOW
+                v.o_top     = 4'b1000;
+                v.o_bot     = 4'b0100;
+                v.o_plus    = 1'b0;
+                v.o_minus   = 1'b0;
+                v.o_pause_p = 1'b0;
+                v.o_pause_n = 1'b1;
+              end
+              v.rx_state = ST_IDLE;
             end
             3'h5: begin
               v.rx_state = is_start ? ST_IDLE : ST_CMD_START;
             end
-            3'h6: begin
+            3'h6: begin // ST_CMD_SHUTDOWN
               v.start_state = START_IDLE;
               v.timer       = 32'h00000000;
-              v.rx_state    = ST_CMD_SHUTDOWN;
+              // O.ST в LOW, O.СH в LOW, O.BOT1-4 и O.TOP1-4 в LOW, O.FAN  в LOW
+              v.o_top     = 4'b0000;
+              v.o_bot     = 4'b0000;
+              v.o_plus    = 1'b0;
+              v.o_minus   = 1'b0;
+              v.o_pause_p = 1'b0;
+              v.o_pause_n = 1'b0;
+              v.o_st      = 1'b0;
+              v.o_ch      = 1'b0;
+              v.o_fan     = 1'b0;
+              v.rx_state  = ST_IDLE;
             end
             3'h7: begin
               v.rx_state = is_start ? ST_IDLE : ST_CMD_DISCHARGE0;
@@ -239,61 +279,6 @@ module top #(
           end
           v.rx_state = ST_IDLE;
         end // case: ST_CMD_PAUSE
-        ST_CMD_PLUS: begin
-          if (w_bus == 3'h0) begin
-            if ((r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
-              v.o_top     = 4'b0001; // O.TOP1 в HIGH
-              v.o_bot     = 4'b0010; // O.BOT2 в HIGH
-              v.o_plus    = 1'b1;
-              v.o_minus   = 1'b0;
-              v.o_pause_p = 1'b0;
-              v.o_pause_n = 1'b0;
-            end
-          end
-          v.rx_state = ST_IDLE;
-        end // case: ST_CMD_PLUS
-        ST_CMD_MINUS: begin
-          if (w_bus == 3'h0) begin
-            if ((r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
-              // O.TOP2 в HIGH, O.BOT1 в HIGH, все остальные O.TOP и O.BOT в LOW
-              v.o_top     = 4'b0010;
-              v.o_bot     = 4'b0001;
-              v.o_plus    = 1'b0;
-              v.o_minus   = 1'b1;
-              v.o_pause_p = 1'b0;
-              v.o_pause_n = 1'b0;
-            end
-          end
-          v.rx_state = ST_IDLE;
-        end // case: ST_CMD_MINUS
-        ST_CMD_BALLAST_P: begin
-          if (w_bus == 3'h0) begin
-            if ((r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
-              // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
-              v.o_top     = 4'b0100;
-              v.o_bot     = 4'b1000;
-              v.o_plus    = 1'b0;
-              v.o_minus   = 1'b0;
-              v.o_pause_p = 1'b1;
-              v.o_pause_n = 1'b0;
-            end
-          end
-          v.rx_state = ST_IDLE;
-        end // case: ST_CMD_BALLAST_P
-        ST_CMD_BALLAST_N: begin
-          if (w_bus == 3'h0) begin
-            if ((r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
-              // O.TOP4 в HIGH, O.BOT3 в HIGH, все остальные O.TOP и O.BOT в LOW
-              v.o_top     = 4'b1000;
-              v.o_bot     = 4'b0100;
-              v.o_plus    = 1'b0;
-              v.o_minus   = 1'b0;
-              v.o_pause_p = 1'b0;
-              v.o_pause_n = 1'b1;
-            end
-          end
-          v.rx_state = ST_IDLE;
-        end // case: ST_CMD_BALLAST_N
         ST_CMD_START: begin
           if (w_bus == 3'h0) begin
             v.o_top       = 4'b0000;
@@ -311,21 +296,6 @@ module top #(
           end
           v.rx_state    = ST_IDLE;
         end // case: ST_CMD_START
-        ST_CMD_SHUTDOWN: begin
-          if (w_bus == 3'h0) begin
-            // O.ST в LOW, O.СH в LOW, O.BOT1-4 и O.TOP1-4 в LOW, O.FAN  в LOW
-            v.o_top     = 4'b0000;
-            v.o_bot     = 4'b0000;
-            v.o_plus    = 1'b0;
-            v.o_minus   = 1'b0;
-            v.o_pause_p = 1'b0;
-            v.o_pause_n = 1'b0;
-            v.o_st      = 1'b0;
-            v.o_ch      = 1'b0;
-            v.o_fan     = 1'b0;
-          end
-          v.rx_state  = ST_IDLE;
-        end // case: ST_CMD_SHUTDOWN
         ST_CMD_DISCHARGE0: begin
           v.rx_state = (w_bus == 3'h0) ? ST_CMD_DISCHARGE1 : ST_IDLE;
         end
@@ -336,16 +306,28 @@ module top #(
           v.rx_state = (w_bus == 3'h0) ? ST_CMD_DISCHARGE3 : ST_IDLE;
         end
         ST_CMD_DISCHARGE3: begin
-          if (w_bus == 3'h1) begin
-            if ((r.o_st == 1'b0) && (r.o_ch == 1'b0)) begin
-              // O.TOP1 в HIGH, O.BOT2 в HIGH, все остальные O.TOP и O.BOT в LOW
-              v.o_top     = 4'b0001;
-              v.o_bot     = 4'b0010;
-              v.o_plus    = 1'b1;
-              v.o_minus   = 1'b0;
-              v.o_pause_p = 1'b0;
-              v.o_pause_n = 1'b0;
-            end
+          if ((r.o_st == 1'b0) && (r.o_ch == 1'b0)) begin
+            case (w_bus)
+              3'h1: begin // команда 70701
+                // O.TOP1 в HIGH, O.BOT2 в HIGH, все остальные O.TOP и O.BOT в LOW
+                v.o_top     = 4'b0001;
+                v.o_bot     = 4'b0010;
+                v.o_plus    = 1'b1;
+                v.o_minus   = 1'b0;
+                v.o_pause_p = 1'b0;
+                v.o_pause_n = 1'b0;
+              end
+              3'h3: begin // команда 70703
+                // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
+                v.o_top     = 4'b0100;
+                v.o_bot     = 4'b1000;
+                v.o_plus    = 1'b1;
+                v.o_minus   = 1'b0;
+                v.o_pause_p = 1'b0;
+                v.o_pause_n = 1'b0;
+              end
+              default:;
+            endcase
           end
           v.rx_state = ST_IDLE;
         end // case: ST_CMD_DISCHARGE3
