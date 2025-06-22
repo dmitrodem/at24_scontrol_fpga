@@ -73,9 +73,9 @@ module top #(
   filter #(.WIDTH(16)) u_err_dr2 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_2), .o(w_err_dr[2]));
   filter #(.WIDTH(16)) u_err_dr3 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_3), .o(w_err_dr[3]));
   filter #(.WIDTH(16)) u_err_dr4 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_4), .o(w_err_dr[4]));
-  filter #(.WIDTH(16)) u_err_u (.clk (clk), .rstn(rstn), .i(I_ERR_U), .o(w_err_u));
-  filter #(.WIDTH(16)) u_err_i (.clk (clk), .rstn(rstn), .i(I_ERR_I), .o(w_err_i));
-  filter #(.WIDTH(16)) u_bt (.clk (clk), .rstn(rstn), .i(~I_BT), .o(w_bt));
+  filter #(.WIDTH(16)) u_err_u (.clk (clk), .rstn(rstn), .i(~I_ERR_U), .o(w_err_u));
+  filter #(.WIDTH(16)) u_err_i (.clk (clk), .rstn(rstn), .i(~I_ERR_I), .o(w_err_i));
+  filter #(.WIDTH(16)) u_bt (.clk (clk), .rstn(rstn), .i(I_BT), .o(w_bt));
   filter #(.WIDTH(16)) u_stop_k (.clk (clk), .rstn(rstn), .i(~I_STOP_K), .o(w_stop_k));
 
   typedef enum bit [1:0] {
@@ -355,6 +355,33 @@ module top #(
     if (w_stop_k) begin
       v.o_stop = 1'b1;
     end
+	
+	if (w_err_u) begin 
+        v.o_avv = 1'b1;
+    end
+	
+	if (w_err_i) begin
+        v.o_avi = 1'b1;
+    end
+
+    if (w_bt) begin
+        v.o_td = 1'b1;
+    end
+	
+	if (w_err_dr[1]) begin
+        v.o_erbd[1] = 1'b1;
+    end
+	if (w_err_dr[2]) begin
+        v.o_erbd[2] = 1'b1;
+    end
+	if (w_err_dr[3]) begin
+        v.o_erbd[3] = 1'b1;
+    end
+	
+	if (w_err_dr[4]) begin
+        v.o_erbd[4] = 1'b1;
+    end
+	
 
     rin = v;
   end
@@ -377,14 +404,14 @@ module top #(
   assign O_TOP_3   = r.o_top[3];
   assign O_TOP_4   = r.o_top[4];
 
-  assign O_AVI     = w_err_i;
-  assign O_AVV     = w_err_u;
-  assign O_TD      = w_bt;
+  assign O_AVI     = r.o_avi;
+  assign O_AVV     = r.o_avv;
+  assign O_TD      = r.o_td; 
 
-  assign O_ERBD1   = w_err_dr[1];
-  assign O_ERBD2   = w_err_dr[2];
-  assign O_ERBD3   = w_err_dr[3];
-  assign O_ERBD4   = w_err_dr[4];
+  assign O_ERBD1   = r.o_erbd[1];
+  assign O_ERBD2   = r.o_erbd[2];
+  assign O_ERBD3   = r.o_erbd[3];
+  assign O_ERBD4   = r.o_erbd[4];
 
   assign O_BREAK   = r.o_break;
   assign O_MINUS   = r.o_minus;
