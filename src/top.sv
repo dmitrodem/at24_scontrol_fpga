@@ -192,8 +192,14 @@ module top #(
       case (r.rx_state)
         ST_IDLE: begin
           case (w_bus)
-            3'h0: begin
-              v.rx_state = is_start ? ST_IDLE : ST_CMD_PAUSE;
+            3'h0: begin // ST_CMD_PAUSE
+				v.o_top     = 4'b0000;
+				v.o_bot     = 4'b0000;
+				v.o_plus    = 1'b0;
+				v.o_minus   = 1'b0;
+				v.o_pause_p = 1'b0;
+				v.o_pause_n = 1'b0;
+				v.rx_state = ST_IDLE;
             end
             3'h1: begin // ST_CMD_PLUS
               if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
@@ -268,17 +274,6 @@ module top #(
             end
           endcase // case (w_bus)
         end // case: ST_IDLE
-        ST_CMD_PAUSE: begin
-          if (w_bus == 3'h0) begin
-            v.o_top     = 4'b0000;
-            v.o_bot     = 4'b0000;
-            v.o_plus    = 1'b0;
-            v.o_minus   = 1'b0;
-            v.o_pause_p = 1'b0;
-            v.o_pause_n = 1'b0;
-          end
-          v.rx_state = ST_IDLE;
-        end // case: ST_CMD_PAUSE
         ST_CMD_START: begin
           if (w_bus == 3'h0) begin
             v.o_top       = 4'b0000;
