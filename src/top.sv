@@ -347,36 +347,12 @@ module top #(
       v.rx_state  = ST_ERROR;
     end
 
-    if (w_stop_k) begin
-      v.o_stop = 1'b1;
-    end
-	
-	if (w_err_u) begin 
-        v.o_avv = 1'b1;
-    end
-	
-	if (w_err_i) begin
-        v.o_avi = 1'b1;
-    end
-
-    if (w_bt) begin
-        v.o_td = 1'b1;
-    end
-	
-	if (w_err_dr[1]) begin
-        v.o_erbd[1] = 1'b1;
-    end
-	if (w_err_dr[2]) begin
-        v.o_erbd[2] = 1'b1;
-    end
-	if (w_err_dr[3]) begin
-        v.o_erbd[3] = 1'b1;
-    end
-	
-	if (w_err_dr[4]) begin
-        v.o_erbd[4] = 1'b1;
-    end
-	
+    v.o_stop = w_stop_k ? 1'b1: r.o_stop;
+    v.o_avv  = w_err_u  ? 1'b1: r.o_avv;
+    v.o_avi  = w_err_i  ? 1'b1: r.o_avi;
+    v.o_td   = w_bt     ? 1'b1: r.o_td;
+    for (int i = 1; i < 5; i = i + 1)
+      v.o_erbd[i] = w_err_dr[i] ? 1'b1: r.o_erbd[i];
 
     rin = v;
   end
@@ -401,7 +377,7 @@ module top #(
 
   assign O_AVI     = r.o_avi;
   assign O_AVV     = r.o_avv;
-  assign O_TD      = r.o_td; 
+  assign O_TD      = r.o_td;
 
   assign O_ERBD1   = r.o_erbd[1];
   assign O_ERBD2   = r.o_erbd[2];
