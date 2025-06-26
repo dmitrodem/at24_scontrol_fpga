@@ -5,10 +5,10 @@ module testbench;
   reg I_BT           = 1'b0;
   reg I_CLK          = 1'b0;
   reg [2:0] I_C      = 3'b000;
-  reg [4:1] I_ERR_DR = 4'b0000;
-  reg       I_ERR_I  = 1'b0;
-  reg       I_ERR_U  = 1'b0;
-  reg       I_STOP_K = 1'b0;
+  reg [4:1] I_ERR_DR = 4'b1111;
+  reg       I_ERR_I  = 1'b1;
+  reg       I_ERR_U  = 1'b1;
+  reg       I_STOP_K = 1'b1;
 
   wire      O_AVI;
   wire      O_AVV;
@@ -28,11 +28,16 @@ module testbench;
   wire       O_STOP;
   wire       O_TD;
 
+  localparam FREQ = 50000;
+
   top #(
-    .FREQ(50000)
+    .FREQ(FREQ)
   ) u0 (
     .clk (clk),
     .rst (rst),
+
+    .led_ready(),
+    .led_done(),
 
     // inputs
     .I_BT (I_BT),
@@ -92,74 +97,93 @@ module testbench;
       #(1us);
       I_CLK = 1'b0;
       #(1us);
-
-      I_C   = 3'h0;
-      I_CLK = 1'b1;
-      #(1us);
-      I_CLK = 1'b0;
-      #(1us);
     end
   endtask
 
-  task run_discharge;
+  task cmd_pause;
     begin
-      I_C   = 3'h7;
-      I_CLK = 1'b1;
-      #(1us);
-      I_CLK = 1'b0;
-      #(1us);
+      run_cmd(3'h0);
+      assert ((O_TOP == 4'b0000) & (O_BOT == 4'b0000) & ~O_PLUS & ~O_MINUS & ~O_PAUSE_P & ~O_PAUSE_N);
+    end
+  endtask
+  task cmd_plus;
+    begin
+      run_cmd(3'h1);
+      assert ((O_TOP == 4'b0001) & (O_BOT == 4'b0010) & O_PLUS & ~O_MINUS & ~O_PAUSE_P & ~O_PAUSE_N);
+    end
+  endtask
+  task cmd_minus;
+    begin
+      run_cmd(3'h2);
+      assert ((O_TOP == 4'b0010) & (O_BOT == 4'b0001) & ~O_PLUS & O_MINUS & ~O_PAUSE_P & ~O_PAUSE_N);
+    end
+  endtask
+  task cmd_ballast_p;
+    begin
+      run_cmd(3'h3);
+      assert ((O_TOP == 4'b0100) & (O_BOT == 4'b1000) & ~O_PLUS & ~O_MINUS & O_PAUSE_P & ~O_PAUSE_N);
+    end
+  endtask
+  task cmd_ballast_n;
+    begin
+      run_cmd(3'h4);
+      assert ((O_TOP == 4'b1000) & (O_BOT == 4'b0100) & ~O_PLUS & ~O_MINUS & ~O_PAUSE_P & O_PAUSE_N);
+    end
+  endtask
+  task cmd_start; begin
+    run_cmd(3'h5);
+    run_cmd(3'h0);
+    assert ((O_TOP == 4'b0000) & (O_BOT == 4'b0000) & ~O_PLUS & ~O_MINUS & ~O_PAUSE_P & ~O_PAUSE_N);
+    assert (O_FAN == 1'b1);
+    assert (~O_ST & O_CH);
+    #(15ms); // 1000x speedup
+    assert (O_ST & O_CH);
+    #(1ms) // 1000x speedup
+    assert (O_ST & ~O_CH);
+  end
+  endtask
+  task cmd_shutdown;
+    begin
+      run_cmd(3'h6);
+      assert ((O_TOP == 4'b0000) & (O_BOT == 4'b0000) & ~O_PLUS & ~O_MINUS & ~O_PAUSE_P & ~O_PAUSE_N);
+      assert (~O_ST & ~O_CH & ~O_FAN);
+    end
+  endtask
+  task cmd_discharge_1;
+    begin
+      run_cmd(3'h7);
+      run_cmd(3'h0);
+      run_cmd(3'h7);
+      run_cmd(3'h0);
+      run_cmd(3'h1);
+    end
+  endtask
 
-      I_C   = 3'h0;
-      I_CLK = 1'b1;
-      #(1us);
-      I_CLK = 1'b0;
-      #(1us);
-
-      I_C   = 3'h7;
-      I_CLK = 1'b1;
-      #(1us);
-      I_CLK = 1'b0;
-      #(1us);
-
-      I_C   = 3'h0;
-      I_CLK = 1'b1;
-      #(1us);
-      I_CLK = 1'b0;
-      #(1us);
-
-      I_C   = 3'h1;
-      I_CLK = 1'b1;
-      #(1us);
-      I_CLK = 1'b0;
-      #(1us);
-
+  task cmd_discharge_3;
+    begin
+      run_cmd(3'h7);
+      run_cmd(3'h0);
+      run_cmd(3'h7);
+      run_cmd(3'h0);
+      run_cmd(3'h3);
     end
   endtask
 
   initial begin;
+    $timeformat(-9, 0, "ns", 16);
     $dumpfile("waveform.vcd");
     $dumpvars();
-    run_cmd(3'h5);
-    #(1us);
-    wait (O_CHARGE == 1'b0);
-    #(1us);
-    run_cmd(3'h1);
-    run_cmd(3'h2);
-    run_cmd(3'h3);
-    run_cmd(3'h4);
-    run_cmd(3'h0);
-    run_cmd(3'h0);
-    run_cmd(3'h1);
-    @(posedge clk);
-    I_STOP_K = 1'b1;
-    #(100ns);
-    @(posedge clk);
-    run_cmd(3'h2);
-    run_cmd(3'h3);
-    run_cmd(3'h4);
-    run_cmd(3'h6);
-    run_discharge();
-    #(1us);
+    cmd_start();
+    wait (O_CH == 1'b0);
+    cmd_pause();
+    for (int i = 0; i < 10; i = i + 1) begin
+      cmd_plus();
+      cmd_minus();
+    end
+
+    cmd_shutdown();
+
+    #(10us);
     $stop();
   end
 

@@ -1,6 +1,7 @@
 `default_nettype none
 module top #(
-  parameter FREQ = 50000000
+  parameter FREQ = 50000000,
+  parameter FILTER_WIDTH = 8
 ) (
   input wire  clk,        // E2
   input wire  rst,        // H11
@@ -65,18 +66,26 @@ module top #(
 
   assign rstn = ~rst;
 
-  filter #(.WIDTH(16)) u_clk (.clk (clk), .rstn(rstn), .i(I_CLK), .o(w_clk));
-  filter #(.WIDTH(16)) u_c0 (.clk (clk), .rstn(rstn), .i(I_C0), .o(w_bus[0]));
-  filter #(.WIDTH(16)) u_c1 (.clk (clk), .rstn(rstn), .i(I_C1), .o(w_bus[1]));
-  filter #(.WIDTH(16)) u_c2 (.clk (clk), .rstn(rstn), .i(I_C2), .o(w_bus[2]));
-  filter #(.WIDTH(16)) u_err_dr1 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_1), .o(w_err_dr[1]));
-  filter #(.WIDTH(16)) u_err_dr2 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_2), .o(w_err_dr[2]));
-  filter #(.WIDTH(16)) u_err_dr3 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_3), .o(w_err_dr[3]));
-  filter #(.WIDTH(16)) u_err_dr4 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_4), .o(w_err_dr[4]));
-  filter #(.WIDTH(16)) u_err_u (.clk (clk), .rstn(rstn), .i(~I_ERR_U), .o(w_err_u));
-  filter #(.WIDTH(16)) u_err_i (.clk (clk), .rstn(rstn), .i(~I_ERR_I), .o(w_err_i));
-  filter #(.WIDTH(16)) u_bt (.clk (clk), .rstn(rstn), .i(I_BT), .o(w_bt));
-  filter #(.WIDTH(16)) u_stop_k (.clk (clk), .rstn(rstn), .i(~I_STOP_K), .o(w_stop_k));
+  filter #(.WIDTH(FILTER_WIDTH)) u_clk (.clk (clk), .rstn(rstn), .i(I_CLK), .o(w_clk));
+  filter #(.WIDTH(FILTER_WIDTH)) u_c0 (.clk (clk), .rstn(rstn), .i(I_C0), .o(w_bus[0]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_c1 (.clk (clk), .rstn(rstn), .i(I_C1), .o(w_bus[1]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_c2 (.clk (clk), .rstn(rstn), .i(I_C2), .o(w_bus[2]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_err_dr1 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_1), .o(w_err_dr[1]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_err_dr2 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_2), .o(w_err_dr[2]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_err_dr3 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_3), .o(w_err_dr[3]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_err_dr4 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_4), .o(w_err_dr[4]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_err_u (.clk (clk), .rstn(rstn), .i(~I_ERR_U), .o(w_err_u));
+  filter #(.WIDTH(FILTER_WIDTH)) u_err_i (.clk (clk), .rstn(rstn), .i(~I_ERR_I), .o(w_err_i));
+  filter #(.WIDTH(FILTER_WIDTH)) u_bt (.clk (clk), .rstn(rstn), .i(I_BT), .o(w_bt));
+  filter #(.WIDTH(FILTER_WIDTH)) u_stop_k (.clk (clk), .rstn(rstn), .i(~I_STOP_K), .o(w_stop_k));
+
+  localparam     TIMEOUT_15S = (FREQ * 15) - 1;
+  localparam     TIMEOUT_1S  = (FREQ * 1) - 1;
+  localparam     TIMER_WIDTH = $clog2(TIMEOUT_15S + 1);
+
+  localparam     LED_NORMAL  = (FREQ) - 1;
+  localparam     LED_ERROR   = (FREQ/8) - 1;
+  localparam     LED_TIMER_WIDTH = $clog2(LED_NORMAL + 1);
 
   typedef enum bit [1:0] {
     START_IDLE    = 0,
@@ -114,9 +123,9 @@ module top #(
     bit       o_pause_p;
     bit       o_pause_n;
     bit       o_stop;
-    bit [31:0] timer;
-    bit [31:0] led_timer;
-    bit        led_ready;
+    bit [TIMER_WIDTH-1:0] timer;
+    bit [LED_TIMER_WIDTH-1:0] led_timer;
+    bit                       led_ready;
   } state_t;
 
   localparam     state_t RES_state = '{
@@ -138,27 +147,46 @@ module top #(
     o_pause_p: 1'b0,
     o_pause_n: 1'b0,
     o_stop: 1'b0,
-    timer: 32'h00000000,
-    led_timer: 32'h00000000,
+    timer: {TIMER_WIDTH{1'b0}},
+    led_timer: {LED_TIMER_WIDTH{1'b0}},
     led_ready: 1'b0
   };
 
-  localparam     TIMEOUT_15S = FREQ * 15;
-  localparam     TIMEOUT_1S  = FREQ * 1;
-
-  localparam     LED_NORMAL  = FREQ;
-  localparam     LED_ERROR   = FREQ/8;
-
-  state_t r                  = RES_state;
+  state_t r = RES_state;
   state_t rin;
 
-  always_comb begin
+  // synthesis translate_off
+  typedef struct  {
+    string msg;
+    bit    send;
+  } mailbox_t;
+
+  mailbox_t rm;
+  mailbox_t rmin;
+  // synthesis translate_on
+
+  task sendmsg (input string msg);
+    begin
+      // synthesis translate_off
+      rmin.send = 1'b1;
+      rmin.msg  = msg;
+      // synthesis translate_on
+    end
+  endtask
+
+  always @(*) begin
     automatic state_t v = r;
+
     automatic bit is_start;
 
-    v.w_clk = w_clk;
+    v.w_clk   = w_clk;
 
-    if (r.led_timer > 0) begin
+    // synthesis translate_off
+    rmin.send = 1'b0;
+    rmin.msg  = "";
+    // synthesis translate_on
+
+    if (|r.led_timer) begin
       v.led_timer = r.led_timer - 1;
     end else begin
       v.led_ready = ~r.led_ready;
@@ -173,14 +201,14 @@ module top #(
     case (r.start_state)
       START_IDLE:;
       START_WAIT15S: begin
-        if (r.timer == 32'h00000000) begin
+        if (|r.timer == 1'b0) begin
           v.o_st        = 1'b1;
           v.timer       = TIMEOUT_1S;
           v.start_state = START_WAIT1S;
         end
       end
       START_WAIT1S: begin
-        if (r.timer == 32'h00000000) begin
+        if (|r.timer == 1'b0) begin
           v.o_ch        = 1'b0;
           v.start_state = START_IDLE;
         end
@@ -193,16 +221,18 @@ module top #(
         ST_IDLE: begin
           case (w_bus)
             3'h0: begin // ST_CMD_PAUSE
-				v.o_top     = 4'b0000;
-				v.o_bot     = 4'b0000;
-				v.o_plus    = 1'b0;
-				v.o_minus   = 1'b0;
-				v.o_pause_p = 1'b0;
-				v.o_pause_n = 1'b0;
-				v.rx_state = ST_IDLE;
+              sendmsg("CMD_PAUSE");
+              v.o_top     = 4'b0000;
+              v.o_bot     = 4'b0000;
+              v.o_plus    = 1'b0;
+              v.o_minus   = 1'b0;
+              v.o_pause_p = 1'b0;
+              v.o_pause_n = 1'b0;
+              v.rx_state  = ST_IDLE;
             end
             3'h1: begin // ST_CMD_PLUS
               if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+                sendmsg("CMD_PLUS");
                 v.o_top     = 4'b0001; // O.TOP1 в HIGH
                 v.o_bot     = 4'b0010; // O.BOT2 в HIGH
                 v.o_plus    = 1'b1;
@@ -215,6 +245,7 @@ module top #(
             3'h2: begin // ST_CMD_MINUS
               if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
                 // O.TOP2 в HIGH, O.BOT1 в HIGH, все остальные O.TOP и O.BOT в LOW
+                sendmsg("CMD_MINUS");
                 v.o_top     = 4'b0010;
                 v.o_bot     = 4'b0001;
                 v.o_plus    = 1'b0;
@@ -227,6 +258,7 @@ module top #(
             3'h3: begin // ST_CMD_BALLAST_P
               if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
                 // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
+                sendmsg("CMD_BALLAST_P");
                 v.o_top     = 4'b0100;
                 v.o_bot     = 4'b1000;
                 v.o_plus    = 1'b0;
@@ -239,6 +271,7 @@ module top #(
             3'h4: begin // ST_CMD_BALLAST_N
               if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
                 // O.TOP4 в HIGH, O.BOT3 в HIGH, все остальные O.TOP и O.BOT в LOW
+                sendmsg("CMD_BALLAST_N");
                 v.o_top     = 4'b1000;
                 v.o_bot     = 4'b0100;
                 v.o_plus    = 1'b0;
@@ -253,8 +286,9 @@ module top #(
             end
             3'h6: begin // ST_CMD_SHUTDOWN
               v.start_state = START_IDLE;
-              v.timer       = 32'h00000000;
+              v.timer       = {TIMER_WIDTH{1'b0}};
               // O.ST в LOW, O.СH в LOW, O.BOT1-4 и O.TOP1-4 в LOW, O.FAN  в LOW
+              sendmsg("CMD_SHUTDOWN");
               v.o_top     = 4'b0000;
               v.o_bot     = 4'b0000;
               v.o_plus    = 1'b0;
@@ -270,12 +304,14 @@ module top #(
               v.rx_state = is_start ? ST_IDLE : ST_CMD_DISCHARGE0;
             end
             default: begin
+              sendmsg("CMD_UNKNOWN");
               v.rx_state = ST_IDLE;
             end
           endcase // case (w_bus)
         end // case: ST_IDLE
         ST_CMD_START: begin
           if (w_bus == 3'h0) begin
+            sendmsg("CMD_START");
             v.o_top       = 4'b0000;
             v.o_bot       = 4'b0000;
             v.o_plus      = 1'b0;
@@ -305,6 +341,7 @@ module top #(
             case (w_bus)
               3'h1: begin // команда 70701
                 // O.TOP1 в HIGH, O.BOT2 в HIGH, все остальные O.TOP и O.BOT в LOW
+                sendmsg("CMD_DISCHARGE_1");
                 v.o_top     = 4'b0001;
                 v.o_bot     = 4'b0010;
                 v.o_plus    = 1'b1;
@@ -314,6 +351,7 @@ module top #(
               end
               3'h3: begin // команда 70703
                 // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
+                sendmsg("CMD_DISCHARGE_3");
                 v.o_top     = 4'b0100;
                 v.o_bot     = 4'b1000;
                 v.o_plus    = 1'b1;
@@ -364,6 +402,19 @@ module top #(
       r <= rin;
     end
   end
+
+  // synthesis translate_off
+  always_ff @(posedge clk or negedge rstn) begin
+    if (~rstn) begin
+      rm.msg <= "";
+      rm.send <= 1'b0;
+    end else begin
+      rm <= rmin;
+      if (rm.send)
+        $display("%t :: %s", $time, rm.msg);
+    end
+  end
+  // synthesis translate_on
 
   assign O_BOT_1   = r.o_bot[1];
   assign O_BOT_2   = r.o_bot[2];
