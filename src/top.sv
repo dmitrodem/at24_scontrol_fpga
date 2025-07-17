@@ -102,8 +102,7 @@ module top #(
     ST_CMD_DISCHARGE1 = 4,
     ST_CMD_DISCHARGE2 = 5,
     ST_CMD_DISCHARGE3 = 6,
-    ST_UPDATE         = 7,
-    ST_ERROR          = 8
+    ST_ERROR          = 7
   } rx_cmd_state_t;
 
   typedef struct packed {
@@ -135,6 +134,7 @@ module top #(
     bit                       nxt_minus;
     bit                       nxt_pause_p;
     bit                       nxt_pause_n;
+    bit                       update_outputs;
   } state_t;
 
   localparam     state_t RES_state = '{
@@ -165,7 +165,8 @@ module top #(
     nxt_plus: 1'b0,
     nxt_minus: 1'b0,
     nxt_pause_p: 1'b0,
-    nxt_pause_n: 1'b0
+    nxt_pause_n: 1'b0,
+    update_outputs: 1'b0
   };
 
   state_t r = RES_state;
@@ -244,11 +245,20 @@ end
 
     if (|r.ws) begin
       v.ws = r.ws - 1;
+    end else if (r.update_outputs) begin
+      v.update_outputs = 1'b0;
+      v.o_top     = r.nxt_top;
+      v.o_bot     = r.nxt_bot;
+      v.o_plus    = r.nxt_plus;
+      v.o_minus   = r.nxt_minus;
+      v.o_pause_p = r.nxt_pause_p;
+      v.o_pause_n = r.nxt_pause_n;
     end
 
     if ({r.w_clk, w_clk} == 2'b10) begin
       case (r.rx_state)
         ST_IDLE: begin
+          if (~r.update_outputs) begin
           case (w_bus)
             3'h0: begin // ST_CMD_PAUSE
               sendmsg("CMD_PAUSE");
@@ -266,10 +276,9 @@ end
                 v.nxt_pause_n = 1'b0;
                 `X_PAUSE(v);
                 v.ws = WAITSTATES;
-                v.rx_state = ST_UPDATE;
-              end else begin
-                v.rx_state = ST_IDLE;
+                v.update_outputs = 1'b1;
               end
+              v.rx_state = ST_IDLE;
             end
             3'h2: begin // ST_CMD_MINUS
               if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
@@ -283,10 +292,9 @@ end
                 v.nxt_pause_n = 1'b0;
                 `X_PAUSE(v);
                 v.ws = WAITSTATES;
-                v.rx_state = ST_UPDATE;
-              end else begin
-                v.rx_state = ST_IDLE;
+                v.update_outputs = 1'b1;
               end
+              v.rx_state = ST_IDLE;
             end
             3'h3: begin // ST_CMD_BALLAST_P
               if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
@@ -300,10 +308,9 @@ end
                 v.nxt_pause_n = 1'b0;
                 `X_PAUSE(v);
                 v.ws = WAITSTATES;
-                v.rx_state = ST_UPDATE;
-              end else begin
-                v.rx_state = ST_IDLE;
+                v.update_outputs = 1'b1;
               end
+              v.rx_state = ST_IDLE;
             end
             3'h4: begin // ST_CMD_BALLAST_N
               if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
@@ -317,10 +324,9 @@ end
                 v.nxt_pause_n = 1'b1;
                 `X_PAUSE(v);
                 v.ws = WAITSTATES;
-                v.rx_state = ST_UPDATE;
-              end else begin
-                v.rx_state = ST_IDLE;
+                v.update_outputs = 1'b1;
               end
+              v.rx_state = ST_IDLE;
             end
             3'h5: begin
               v.rx_state = is_start ? ST_IDLE : ST_CMD_START;
@@ -344,6 +350,7 @@ end
               v.rx_state = ST_IDLE;
             end
           endcase // case (w_bus)
+          end // if (~r.update_outputs)
         end // case: ST_IDLE
         ST_CMD_START: begin
           if (w_bus == 3'h0) begin
@@ -380,8 +387,9 @@ end
                 v.nxt_pause_p = 1'b0;
                 v.nxt_pause_n = 1'b0;
                 `X_PAUSE(v);
-                v.ws = WAITSTATES;
-                v.rx_state = ST_UPDATE;
+                v.ws             = WAITSTATES;
+                v.update_outputs = 1'b1;
+                v.rx_state       = ST_IDLE;
               end
               3'h3: begin // команда 70703
                 // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
@@ -393,8 +401,9 @@ end
                 v.nxt_pause_p = 1'b0;
                 v.nxt_pause_n = 1'b0;
                 `X_PAUSE(v);
-                v.ws = WAITSTATES;
-                v.rx_state = ST_UPDATE;
+                v.ws             = WAITSTATES;
+                v.update_outputs = 1'b1;
+                v.rx_state       = ST_IDLE;
               end
               default:;
             endcase
@@ -402,17 +411,6 @@ end
             v.rx_state = ST_IDLE;
           end
         end // case: ST_CMD_DISCHARGE3
-        ST_UPDATE: begin
-          if (|r.ws == 1'b0) begin
-            v.o_top     = r.nxt_top;
-            v.o_bot     = r.nxt_bot;
-            v.o_plus    = r.nxt_plus;
-            v.o_minus   = r.nxt_minus;
-            v.o_pause_p = r.nxt_pause_p;
-            v.o_pause_n = r.nxt_pause_n;
-            v.rx_state = ST_IDLE;
-          end
-        end // case: ST_UPDATE
         ST_ERROR:;
         default:;
       endcase
