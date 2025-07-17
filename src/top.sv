@@ -1,7 +1,8 @@
 `default_nettype none
 module top #(
-  parameter FREQ = 50000000,
-  parameter FILTER_WIDTH = 8
+  parameter FREQ         = 50000000,
+  parameter FILTER_WIDTH = 8,
+  parameter WAITSTATES   = 4
 ) (
   input wire  clk,        // E2
   input wire  rst,        // H11
@@ -93,7 +94,7 @@ module top #(
     START_WAIT1S  = 2
   } start_state_t;
 
-  typedef enum bit [2:0] {
+  typedef enum bit [3:0] {
     ST_IDLE           = 0,
     ST_CMD_PAUSE      = 1,
     ST_CMD_START      = 2,
@@ -101,7 +102,8 @@ module top #(
     ST_CMD_DISCHARGE1 = 4,
     ST_CMD_DISCHARGE2 = 5,
     ST_CMD_DISCHARGE3 = 6,
-    ST_ERROR          = 7
+    ST_UPDATE         = 7,
+    ST_ERROR          = 8
   } rx_cmd_state_t;
 
   typedef struct packed {
@@ -126,6 +128,13 @@ module top #(
     bit [TIMER_WIDTH-1:0] timer;
     bit [LED_TIMER_WIDTH-1:0] led_timer;
     bit                       led_ready;
+    bit [3:0]                 ws;
+    bit [4:1]                 nxt_top;
+    bit [4:1]                 nxt_bot;
+    bit                       nxt_plus;
+    bit                       nxt_minus;
+    bit                       nxt_pause_p;
+    bit                       nxt_pause_n;
   } state_t;
 
   localparam     state_t RES_state = '{
@@ -149,7 +158,14 @@ module top #(
     o_stop: 1'b0,
     timer: {TIMER_WIDTH{1'b0}},
     led_timer: {LED_TIMER_WIDTH{1'b0}},
-    led_ready: 1'b0
+    led_ready: 1'b0,
+    ws : 4'h0,
+    nxt_top: 4'b0000,
+    nxt_bot: 4'b0000,
+    nxt_plus: 1'b0,
+    nxt_minus: 1'b0,
+    nxt_pause_p: 1'b0,
+    nxt_pause_n: 1'b0
   };
 
   state_t r = RES_state;
@@ -173,6 +189,16 @@ module top #(
       // synthesis translate_on
     end
   endtask
+
+`define X_PAUSE(v)         \
+begin                      \
+    v.o_top     = 4'b0000; \
+    v.o_bot     = 4'b0000; \
+    v.o_plus    = 1'b0;    \
+    v.o_minus   = 1'b0;    \
+    v.o_pause_p = 1'b0;    \
+    v.o_pause_n = 1'b0;    \
+end
 
   always @(*) begin
     automatic state_t v = r;
@@ -216,70 +242,85 @@ module top #(
       default:;
     endcase
 
+    if (|r.ws) begin
+      v.ws = r.ws - 1;
+    end
+
     if ({r.w_clk, w_clk} == 2'b10) begin
       case (r.rx_state)
         ST_IDLE: begin
           case (w_bus)
             3'h0: begin // ST_CMD_PAUSE
               sendmsg("CMD_PAUSE");
-              v.o_top     = 4'b0000;
-              v.o_bot     = 4'b0000;
-              v.o_plus    = 1'b0;
-              v.o_minus   = 1'b0;
-              v.o_pause_p = 1'b0;
-              v.o_pause_n = 1'b0;
+              `X_PAUSE(v);
               v.rx_state  = ST_IDLE;
             end
             3'h1: begin // ST_CMD_PLUS
               if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
                 sendmsg("CMD_PLUS");
-                v.o_top     = 4'b0001; // O.TOP1 в HIGH
-                v.o_bot     = 4'b0010; // O.BOT2 в HIGH
-                v.o_plus    = 1'b1;
-                v.o_minus   = 1'b0;
-                v.o_pause_p = 1'b0;
-                v.o_pause_n = 1'b0;
+                v.nxt_top     = 4'b0001; // O.TOP1 в HIGH
+                v.nxt_bot     = 4'b0010; // O.BOT2 в HIGH
+                v.nxt_plus    = 1'b1;
+                v.nxt_minus   = 1'b0;
+                v.nxt_pause_p = 1'b0;
+                v.nxt_pause_n = 1'b0;
+                `X_PAUSE(v);
+                v.ws = WAITSTATES;
+                v.rx_state = ST_UPDATE;
+              end else begin
+                v.rx_state = ST_IDLE;
               end
-              v.rx_state = ST_IDLE;
             end
             3'h2: begin // ST_CMD_MINUS
               if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
                 // O.TOP2 в HIGH, O.BOT1 в HIGH, все остальные O.TOP и O.BOT в LOW
                 sendmsg("CMD_MINUS");
-                v.o_top     = 4'b0010;
-                v.o_bot     = 4'b0001;
-                v.o_plus    = 1'b0;
-                v.o_minus   = 1'b1;
-                v.o_pause_p = 1'b0;
-                v.o_pause_n = 1'b0;
+                v.nxt_top     = 4'b0010;
+                v.nxt_bot     = 4'b0001;
+                v.nxt_plus    = 1'b0;
+                v.nxt_minus   = 1'b1;
+                v.nxt_pause_p = 1'b0;
+                v.nxt_pause_n = 1'b0;
+                `X_PAUSE(v);
+                v.ws = WAITSTATES;
+                v.rx_state = ST_UPDATE;
+              end else begin
+                v.rx_state = ST_IDLE;
               end
-              v.rx_state = ST_IDLE;
             end
             3'h3: begin // ST_CMD_BALLAST_P
               if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
                 // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
                 sendmsg("CMD_BALLAST_P");
-                v.o_top     = 4'b0100;
-                v.o_bot     = 4'b1000;
-                v.o_plus    = 1'b0;
-                v.o_minus   = 1'b0;
-                v.o_pause_p = 1'b1;
-                v.o_pause_n = 1'b0;
+                v.nxt_top     = 4'b0100;
+                v.nxt_bot     = 4'b1000;
+                v.nxt_plus    = 1'b0;
+                v.nxt_minus   = 1'b0;
+                v.nxt_pause_p = 1'b1;
+                v.nxt_pause_n = 1'b0;
+                `X_PAUSE(v);
+                v.ws = WAITSTATES;
+                v.rx_state = ST_UPDATE;
+              end else begin
+                v.rx_state = ST_IDLE;
               end
-              v.rx_state = ST_IDLE;
             end
             3'h4: begin // ST_CMD_BALLAST_N
               if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
                 // O.TOP4 в HIGH, O.BOT3 в HIGH, все остальные O.TOP и O.BOT в LOW
                 sendmsg("CMD_BALLAST_N");
-                v.o_top     = 4'b1000;
-                v.o_bot     = 4'b0100;
-                v.o_plus    = 1'b0;
-                v.o_minus   = 1'b0;
-                v.o_pause_p = 1'b0;
-                v.o_pause_n = 1'b1;
+                v.nxt_top     = 4'b1000;
+                v.nxt_bot     = 4'b0100;
+                v.nxt_plus    = 1'b0;
+                v.nxt_minus   = 1'b0;
+                v.nxt_pause_p = 1'b0;
+                v.nxt_pause_n = 1'b1;
+                `X_PAUSE(v);
+                v.ws = WAITSTATES;
+                v.rx_state = ST_UPDATE;
+              end else begin
+                v.rx_state = ST_IDLE;
               end
-              v.rx_state = ST_IDLE;
             end
             3'h5: begin
               v.rx_state = is_start ? ST_IDLE : ST_CMD_START;
@@ -289,12 +330,7 @@ module top #(
               v.timer       = {TIMER_WIDTH{1'b0}};
               // O.ST в LOW, O.СH в LOW, O.BOT1-4 и O.TOP1-4 в LOW, O.FAN  в LOW
               sendmsg("CMD_SHUTDOWN");
-              v.o_top     = 4'b0000;
-              v.o_bot     = 4'b0000;
-              v.o_plus    = 1'b0;
-              v.o_minus   = 1'b0;
-              v.o_pause_p = 1'b0;
-              v.o_pause_n = 1'b0;
+              `X_PAUSE(v);
               v.o_st      = 1'b0;
               v.o_ch      = 1'b0;
               v.o_fan     = 1'b0;
@@ -312,12 +348,7 @@ module top #(
         ST_CMD_START: begin
           if (w_bus == 3'h0) begin
             sendmsg("CMD_START");
-            v.o_top       = 4'b0000;
-            v.o_bot       = 4'b0000;
-            v.o_plus      = 1'b0;
-            v.o_minus     = 1'b0;
-            v.o_pause_p   = 1'b0;
-            v.o_pause_n   = 1'b0;
+            `X_PAUSE(v);
             // O.FAN  в HIGH, O.ST в LOW, O.СH в HIGH
             v.o_fan       = 1'b1;
             v.o_st        = 1'b0;
@@ -342,28 +373,46 @@ module top #(
               3'h1: begin // команда 70701
                 // O.TOP1 в HIGH, O.BOT2 в HIGH, все остальные O.TOP и O.BOT в LOW
                 sendmsg("CMD_DISCHARGE_1");
-                v.o_top     = 4'b0001;
-                v.o_bot     = 4'b0010;
-                v.o_plus    = 1'b1;
-                v.o_minus   = 1'b0;
-                v.o_pause_p = 1'b0;
-                v.o_pause_n = 1'b0;
+                v.nxt_top     = 4'b0001;
+                v.nxt_bot     = 4'b0010;
+                v.nxt_plus    = 1'b1;
+                v.nxt_minus   = 1'b0;
+                v.nxt_pause_p = 1'b0;
+                v.nxt_pause_n = 1'b0;
+                `X_PAUSE(v);
+                v.ws = WAITSTATES;
+                v.rx_state = ST_UPDATE;
               end
               3'h3: begin // команда 70703
                 // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
                 sendmsg("CMD_DISCHARGE_3");
-                v.o_top     = 4'b0100;
-                v.o_bot     = 4'b1000;
-                v.o_plus    = 1'b1;
-                v.o_minus   = 1'b0;
-                v.o_pause_p = 1'b0;
-                v.o_pause_n = 1'b0;
+                v.nxt_top     = 4'b0100;
+                v.nxt_bot     = 4'b1000;
+                v.nxt_plus    = 1'b1;
+                v.nxt_minus   = 1'b0;
+                v.nxt_pause_p = 1'b0;
+                v.nxt_pause_n = 1'b0;
+                `X_PAUSE(v);
+                v.ws = WAITSTATES;
+                v.rx_state = ST_UPDATE;
               end
               default:;
             endcase
+          end else begin
+            v.rx_state = ST_IDLE;
           end
-          v.rx_state = ST_IDLE;
         end // case: ST_CMD_DISCHARGE3
+        ST_UPDATE: begin
+          if (|r.ws == 1'b0) begin
+            v.o_top     = r.nxt_top;
+            v.o_bot     = r.nxt_bot;
+            v.o_plus    = r.nxt_plus;
+            v.o_minus   = r.nxt_minus;
+            v.o_pause_p = r.nxt_pause_p;
+            v.o_pause_n = r.nxt_pause_n;
+            v.rx_state = ST_IDLE;
+          end
+        end // case: ST_UPDATE
         ST_ERROR:;
         default:;
       endcase
