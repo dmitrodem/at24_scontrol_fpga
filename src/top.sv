@@ -101,8 +101,7 @@ module top #(
     ST_CMD_DISCHARGE0 = 3,
     ST_CMD_DISCHARGE1 = 4,
     ST_CMD_DISCHARGE2 = 5,
-    ST_CMD_DISCHARGE3 = 6,
-    ST_ERROR          = 7
+    ST_ERROR          = 6
   } rx_cmd_state_t;
 
   typedef struct packed {
@@ -135,6 +134,7 @@ module top #(
     bit                       nxt_pause_p;
     bit                       nxt_pause_n;
     bit                       update_outputs;
+    bit                       device_ready;
   } state_t;
 
   localparam     state_t RES_state = '{
@@ -166,7 +166,8 @@ module top #(
     nxt_minus: 1'b0,
     nxt_pause_p: 1'b0,
     nxt_pause_n: 1'b0,
-    update_outputs: 1'b0
+    update_outputs: 1'b0,
+    device_ready: 1'b0
   };
 
   state_t r = RES_state;
@@ -236,8 +237,9 @@ end
       end
       START_WAIT1S: begin
         if (|r.timer == 1'b0) begin
-          v.o_ch        = 1'b0;
-          v.start_state = START_IDLE;
+          v.o_ch         = 1'b0;
+          v.device_ready = 1'b1;
+          v.start_state  = START_IDLE;
         end
       end
       default:;
@@ -261,12 +263,14 @@ end
           if (~r.update_outputs) begin
           case (w_bus)
             3'h0: begin // ST_CMD_PAUSE
-              sendmsg("CMD_PAUSE");
-              `X_PAUSE(v);
+              if (~is_start) begin
+                sendmsg("CMD_PAUSE");
+                `X_PAUSE(v);
+              end
               v.rx_state  = ST_IDLE;
             end
             3'h1: begin // ST_CMD_PLUS
-              if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+              if (~is_start && r.device_ready) begin
                 sendmsg("CMD_PLUS");
                 v.nxt_top     = 4'b0001; // O.TOP1 в HIGH
                 v.nxt_bot     = 4'b0010; // O.BOT2 в HIGH
@@ -281,7 +285,7 @@ end
               v.rx_state = ST_IDLE;
             end
             3'h2: begin // ST_CMD_MINUS
-              if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+              if (~is_start && r.device_ready) begin
                 // O.TOP2 в HIGH, O.BOT1 в HIGH, все остальные O.TOP и O.BOT в LOW
                 sendmsg("CMD_MINUS");
                 v.nxt_top     = 4'b0010;
@@ -297,7 +301,7 @@ end
               v.rx_state = ST_IDLE;
             end
             3'h3: begin // ST_CMD_BALLAST_P
-              if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+              if (~is_start && r.device_ready) begin
                 // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
                 sendmsg("CMD_BALLAST_P");
                 v.nxt_top     = 4'b0100;
@@ -313,7 +317,7 @@ end
               v.rx_state = ST_IDLE;
             end
             3'h4: begin // ST_CMD_BALLAST_N
-              if (~is_start && (r.o_st == 1'b1) && (r.o_ch == 1'b0)) begin
+              if (~is_start && r.device_ready) begin
                 // O.TOP4 в HIGH, O.BOT3 в HIGH, все остальные O.TOP и O.BOT в LOW
                 sendmsg("CMD_BALLAST_N");
                 v.nxt_top     = 4'b1000;
@@ -337,10 +341,11 @@ end
               // O.ST в LOW, O.СH в LOW, O.BOT1-4 и O.TOP1-4 в LOW, O.FAN  в LOW
               sendmsg("CMD_SHUTDOWN");
               `X_PAUSE(v);
-              v.o_st      = 1'b0;
-              v.o_ch      = 1'b0;
-              v.o_fan     = 1'b0;
-              v.rx_state  = ST_IDLE;
+              v.o_st         = 1'b0;
+              v.o_ch         = 1'b0;
+              v.o_fan        = 1'b0;
+              v.device_ready = 1'b0;
+              v.rx_state     = ST_IDLE;
             end
             3'h7: begin
               v.rx_state = is_start ? ST_IDLE : ST_CMD_DISCHARGE0;
@@ -372,45 +377,11 @@ end
           v.rx_state = (w_bus == 3'h7) ? ST_CMD_DISCHARGE2 : ST_IDLE;
         end
         ST_CMD_DISCHARGE2: begin
-          v.rx_state = (w_bus == 3'h0) ? ST_CMD_DISCHARGE3 : ST_IDLE;
-        end
-        ST_CMD_DISCHARGE3: begin
-          if ((r.o_st == 1'b0) && (r.o_ch == 1'b0)) begin
-            case (w_bus)
-              3'h1: begin // команда 70701
-                // O.TOP1 в HIGH, O.BOT2 в HIGH, все остальные O.TOP и O.BOT в LOW
-                sendmsg("CMD_DISCHARGE_1");
-                v.nxt_top     = 4'b0001;
-                v.nxt_bot     = 4'b0010;
-                v.nxt_plus    = 1'b1;
-                v.nxt_minus   = 1'b0;
-                v.nxt_pause_p = 1'b0;
-                v.nxt_pause_n = 1'b0;
-                `X_PAUSE(v);
-                v.ws             = WAITSTATES;
-                v.update_outputs = 1'b1;
-                v.rx_state       = ST_IDLE;
-              end
-              3'h3: begin // команда 70703
-                // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
-                sendmsg("CMD_DISCHARGE_3");
-                v.nxt_top     = 4'b0100;
-                v.nxt_bot     = 4'b1000;
-                v.nxt_plus    = 1'b1;
-                v.nxt_minus   = 1'b0;
-                v.nxt_pause_p = 1'b0;
-                v.nxt_pause_n = 1'b0;
-                `X_PAUSE(v);
-                v.ws             = WAITSTATES;
-                v.update_outputs = 1'b1;
-                v.rx_state       = ST_IDLE;
-              end
-              default:;
-            endcase
-          end else begin
-            v.rx_state = ST_IDLE;
+          if (w_bus == 3'h0) begin
+            v.device_ready = 1'b1;
           end
-        end // case: ST_CMD_DISCHARGE3
+          v.rx_state = ST_IDLE;
+        end
         ST_ERROR:;
         default:;
       endcase
@@ -419,17 +390,18 @@ end
     // I.ERR_DR_1-4, I.ERR_U, I.ERR_I, I.BT, I.STOP_K
     if (|{w_err_dr[4:1], w_err_u, w_err_i, w_bt, w_stop_k}) begin
       // O.FAN в HIGH, O.BOT1-4 и O.TOP1-4 в LOW, O.ST в LOW, O.СH в LOW
-      v.o_fan     = 1'b1;
-      v.o_bot     = 4'b0000;
-      v.o_top     = 4'b0000;
-      v.o_st      = 1'b0;
-      v.o_ch      = 1'b0;
-      v.o_break   = 1'b1;
-      v.o_plus    = 1'b0;
-      v.o_minus   = 1'b0;
-      v.o_pause_p = 1'b0;
-      v.o_pause_n = 1'b0;
-      v.rx_state  = ST_ERROR;
+      v.o_fan        = 1'b1;
+      v.o_bot        = 4'b0000;
+      v.o_top        = 4'b0000;
+      v.o_st         = 1'b0;
+      v.o_ch         = 1'b0;
+      v.o_break      = 1'b1;
+      v.o_plus       = 1'b0;
+      v.o_minus      = 1'b0;
+      v.o_pause_p    = 1'b0;
+      v.o_pause_n    = 1'b0;
+      v.device_ready = 1'b0;
+      v.rx_state     = ST_ERROR;
     end
 
     v.o_stop = w_stop_k ? 1'b1: r.o_stop;
