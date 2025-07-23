@@ -608,7 +608,13 @@ end
   assign O_ST      = r.o_st;
 
   assign led_ready = r.led_ready;
-  assign led_done  = (r.rx_state == ST_IDLE);
+
+
+  reg [25:0] dbg_cnt;
+  always @(posedge clk) begin : dbg_led
+    dbg_cnt <= dbg_cnt + 1;
+  end
+  assign led_done  = dbg_cnt[25];
 
 endmodule
 `default_nettype wire
