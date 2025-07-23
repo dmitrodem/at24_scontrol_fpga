@@ -28,7 +28,7 @@ module testbench;
   wire       O_STOP;
   wire       O_TD;
 
-  localparam FREQ = 50000;
+  localparam FREQ = 500000;
 
   top #(
     .FREQ(FREQ)
@@ -135,11 +135,11 @@ module testbench;
     run_cmd(3'h0);
     assert ((O_TOP == 4'b0000) & (O_BOT == 4'b0000) & ~O_PLUS & ~O_MINUS & ~O_PAUSE_P & ~O_PAUSE_N);
     assert (O_FAN == 1'b1);
-    assert (~O_ST & O_CH);
+    assert (~O_ST & O_CHARGE);
     #(15ms); // 1000x speedup
-    assert (O_ST & O_CH);
+    assert (O_ST & O_CHARGE);
     #(1ms) // 1000x speedup
-    assert (O_ST & ~O_CH);
+    assert (O_ST & ~O_CHARGE);
   end
   endtask
   task cmd_shutdown;
@@ -171,10 +171,10 @@ module testbench;
 
   initial begin;
     $timeformat(-9, 0, "ns", 16);
-    $dumpfile("waveform.vcd");
-    $dumpvars();
+    $dumpfile("waveform.fst");
+    $dumpvars(0, testbench.O_CH);
     cmd_start();
-    wait (O_CH == 1'b0);
+    wait (O_CHARGE == 1'b0);
     cmd_pause();
     for (int i = 0; i < 10; i = i + 1) begin
       cmd_plus();

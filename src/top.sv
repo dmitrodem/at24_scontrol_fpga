@@ -80,18 +80,50 @@ module top #(
   filter #(.WIDTH(FILTER_WIDTH)) u_bt (.clk (clk), .rstn(rstn), .i(I_BT), .o(w_bt));
   filter #(.WIDTH(FILTER_WIDTH)) u_stop_k (.clk (clk), .rstn(rstn), .i(~I_STOP_K), .o(w_stop_k));
 
-  localparam     TIMEOUT_15S = (FREQ * 15) - 1;
-  localparam     TIMEOUT_1S  = (FREQ * 1) - 1;
-  localparam     TIMER_WIDTH = $clog2(TIMEOUT_15S + 1);
+  localparam     TIMEOUT_15S     = (FREQ * 15) - 1;
+  localparam     TIMEOUT_1S      = (FREQ * 1) - 1;
+  localparam     TIMER_WIDTH     = $clog2(TIMEOUT_15S + 1);
 
-  localparam     LED_NORMAL  = (FREQ) - 1;
-  localparam     LED_ERROR   = (FREQ/8) - 1;
+  localparam     LED_NORMAL      = (FREQ) - 1;
+  localparam     LED_ERROR       = (FREQ/8) - 1;
   localparam     LED_TIMER_WIDTH = $clog2(LED_NORMAL + 1);
 
-  typedef enum bit [1:0] {
-    START_IDLE    = 0,
-    START_WAIT15S = 1,
-    START_WAIT1S  = 2
+  localparam     PWM_WIDTH       = 16;
+
+  localparam     PWM_1           = 5;
+  localparam     PWM_2           = 11;
+  localparam     PWM_3           = 23;
+  localparam     PWM_4           = 46;
+  localparam     PWM_5           = 90;
+  localparam     PWM_6           = 174;
+  localparam     PWM_7           = 338;
+  localparam     PWM_8           = 654;
+  localparam     PWM_9           = 1264;
+  localparam     PWM_10          = 2441;
+  localparam     PWM_11          = 4715;
+  localparam     PWM_12          = 9105;
+  localparam     PWM_13          = 17580;
+  localparam     PWM_14          = 33943;
+  localparam     PWM_15          = 65535;
+
+  typedef enum bit [7:0] {
+    START_IDLE   = 0,
+    START_PWM_1  = 1,
+    START_PWM_2  = 2,
+    START_PWM_3  = 3,
+    START_PWM_4  = 4,
+    START_PWM_5  = 5,
+    START_PWM_6  = 6,
+    START_PWM_7  = 7,
+    START_PWM_8  = 8,
+    START_PWM_9  = 9,
+    START_PWM_10 = 10,
+    START_PWM_11 = 11,
+    START_PWM_12 = 12,
+    START_PWM_13 = 13,
+    START_PWM_14 = 14,
+    START_PWM_15 = 15,
+    START_WAIT1S = 16
   } start_state_t;
 
   typedef enum bit [3:0] {
@@ -135,6 +167,8 @@ module top #(
     bit                       nxt_pause_n;
     bit                       update_outputs;
     bit                       device_ready;
+    bit [PWM_WIDTH-1:0]       pwm_counter;
+    bit [PWM_WIDTH-1:0]       pwm_value;
   } state_t;
 
   localparam     state_t RES_state = '{
@@ -167,7 +201,9 @@ module top #(
     nxt_pause_p: 1'b0,
     nxt_pause_n: 1'b0,
     update_outputs: 1'b0,
-    device_ready: 1'b0
+    device_ready: 1'b0,
+    pwm_counter: {PWM_WIDTH{1'b0}},
+    pwm_value: {PWM_WIDTH{1'b0}}
   };
 
   state_t r = RES_state;
@@ -214,6 +250,8 @@ end
     rmin.msg  = "";
     // synthesis translate_on
 
+    v.pwm_counter = r.pwm_counter + 1;
+
     if (|r.led_timer) begin
       v.led_timer = r.led_timer - 1;
     end else begin
@@ -228,7 +266,105 @@ end
     is_start = (r.start_state != START_IDLE);
     case (r.start_state)
       START_IDLE:;
-      START_WAIT15S: begin
+      START_PWM_1: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_2;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_2;
+        end
+      end
+      START_PWM_2: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_3;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_3;
+        end
+      end
+      START_PWM_3: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_4;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_4;
+        end
+      end
+      START_PWM_4: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_5;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_5;
+        end
+      end
+      START_PWM_5: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_6;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_6;
+        end
+      end
+      START_PWM_6: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_7;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_7;
+        end
+      end
+      START_PWM_7: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_8;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_8;
+        end
+      end
+      START_PWM_8: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_9;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_9;
+        end
+      end
+      START_PWM_9: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_10;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_10;
+        end
+      end
+      START_PWM_10: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_11;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_11;
+        end
+      end
+      START_PWM_11: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_12;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_12;
+        end
+      end
+      START_PWM_12: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_13;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_13;
+        end
+      end
+      START_PWM_13: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_14;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_14;
+        end
+      end
+      START_PWM_14: begin
+        if (|r.timer == 1'b0) begin
+          v.pwm_value   = PWM_15;
+          v.timer       = TIMEOUT_1S;
+          v.start_state = START_PWM_15;
+        end
+      end
+      START_PWM_15: begin
         if (|r.timer == 1'b0) begin
           v.o_st        = 1'b1;
           v.timer       = TIMEOUT_1S;
@@ -238,6 +374,7 @@ end
       START_WAIT1S: begin
         if (|r.timer == 1'b0) begin
           v.o_ch         = 1'b0;
+          v.pwm_value    = {PWM_WIDTH{1'b0}};
           v.device_ready = 1'b1;
           v.start_state  = START_IDLE;
         end
@@ -261,100 +398,101 @@ end
       case (r.rx_state)
         ST_IDLE: begin
           if (~r.update_outputs) begin
-          case (w_bus)
-            3'h0: begin // ST_CMD_PAUSE
-              if (~is_start) begin
-                sendmsg("CMD_PAUSE");
-                `X_PAUSE(v);
+            case (w_bus)
+              3'h0: begin // ST_CMD_PAUSE
+                if (~is_start) begin
+                  sendmsg("CMD_PAUSE");
+                  `X_PAUSE(v);
+                end
+                v.rx_state  = ST_IDLE;
               end
-              v.rx_state  = ST_IDLE;
-            end
-            3'h1: begin // ST_CMD_PLUS
-              if (~is_start && r.device_ready) begin
-                sendmsg("CMD_PLUS");
-                v.nxt_top     = 4'b0001; // O.TOP1 в HIGH
-                v.nxt_bot     = 4'b0010; // O.BOT2 в HIGH
-                v.nxt_plus    = 1'b1;
-                v.nxt_minus   = 1'b0;
-                v.nxt_pause_p = 1'b0;
-                v.nxt_pause_n = 1'b0;
-                `X_PAUSE(v);
-                v.ws = WAITSTATES;
-                v.update_outputs = 1'b1;
+              3'h1: begin // ST_CMD_PLUS
+                if (~is_start && r.device_ready) begin
+                  sendmsg("CMD_PLUS");
+                  v.nxt_top     = 4'b0001; // O.TOP1 в HIGH
+                  v.nxt_bot     = 4'b0010; // O.BOT2 в HIGH
+                  v.nxt_plus    = 1'b1;
+                  v.nxt_minus   = 1'b0;
+                  v.nxt_pause_p = 1'b0;
+                  v.nxt_pause_n = 1'b0;
+                  `X_PAUSE(v);
+                  v.ws = WAITSTATES;
+                  v.update_outputs = 1'b1;
+                end
+                v.rx_state = ST_IDLE;
               end
-              v.rx_state = ST_IDLE;
-            end
-            3'h2: begin // ST_CMD_MINUS
-              if (~is_start && r.device_ready) begin
-                // O.TOP2 в HIGH, O.BOT1 в HIGH, все остальные O.TOP и O.BOT в LOW
-                sendmsg("CMD_MINUS");
-                v.nxt_top     = 4'b0010;
-                v.nxt_bot     = 4'b0001;
-                v.nxt_plus    = 1'b0;
-                v.nxt_minus   = 1'b1;
-                v.nxt_pause_p = 1'b0;
-                v.nxt_pause_n = 1'b0;
-                `X_PAUSE(v);
-                v.ws = WAITSTATES;
-                v.update_outputs = 1'b1;
+              3'h2: begin // ST_CMD_MINUS
+                if (~is_start && r.device_ready) begin
+                  // O.TOP2 в HIGH, O.BOT1 в HIGH, все остальные O.TOP и O.BOT в LOW
+                  sendmsg("CMD_MINUS");
+                  v.nxt_top     = 4'b0010;
+                  v.nxt_bot     = 4'b0001;
+                  v.nxt_plus    = 1'b0;
+                  v.nxt_minus   = 1'b1;
+                  v.nxt_pause_p = 1'b0;
+                  v.nxt_pause_n = 1'b0;
+                  `X_PAUSE(v);
+                  v.ws = WAITSTATES;
+                  v.update_outputs = 1'b1;
+                end
+                v.rx_state = ST_IDLE;
               end
-              v.rx_state = ST_IDLE;
-            end
-            3'h3: begin // ST_CMD_BALLAST_P
-              if (~is_start && r.device_ready) begin
-                // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
-                sendmsg("CMD_BALLAST_P");
-                v.nxt_top     = 4'b0100;
-                v.nxt_bot     = 4'b1000;
-                v.nxt_plus    = 1'b0;
-                v.nxt_minus   = 1'b0;
-                v.nxt_pause_p = 1'b1;
-                v.nxt_pause_n = 1'b0;
-                `X_PAUSE(v);
-                v.ws = WAITSTATES;
-                v.update_outputs = 1'b1;
+              3'h3: begin // ST_CMD_BALLAST_P
+                if (~is_start && r.device_ready) begin
+                  // O.TOP3 в HIGH, O.BOT4 в HIGH, все остальные O.TOP и O.BOT в LOW
+                  sendmsg("CMD_BALLAST_P");
+                  v.nxt_top     = 4'b0100;
+                  v.nxt_bot     = 4'b1000;
+                  v.nxt_plus    = 1'b0;
+                  v.nxt_minus   = 1'b0;
+                  v.nxt_pause_p = 1'b1;
+                  v.nxt_pause_n = 1'b0;
+                  `X_PAUSE(v);
+                  v.ws = WAITSTATES;
+                  v.update_outputs = 1'b1;
+                end
+                v.rx_state = ST_IDLE;
               end
-              v.rx_state = ST_IDLE;
-            end
-            3'h4: begin // ST_CMD_BALLAST_N
-              if (~is_start && r.device_ready) begin
-                // O.TOP4 в HIGH, O.BOT3 в HIGH, все остальные O.TOP и O.BOT в LOW
-                sendmsg("CMD_BALLAST_N");
-                v.nxt_top     = 4'b1000;
-                v.nxt_bot     = 4'b0100;
-                v.nxt_plus    = 1'b0;
-                v.nxt_minus   = 1'b0;
-                v.nxt_pause_p = 1'b0;
-                v.nxt_pause_n = 1'b1;
-                `X_PAUSE(v);
-                v.ws = WAITSTATES;
-                v.update_outputs = 1'b1;
+              3'h4: begin // ST_CMD_BALLAST_N
+                if (~is_start && r.device_ready) begin
+                  // O.TOP4 в HIGH, O.BOT3 в HIGH, все остальные O.TOP и O.BOT в LOW
+                  sendmsg("CMD_BALLAST_N");
+                  v.nxt_top     = 4'b1000;
+                  v.nxt_bot     = 4'b0100;
+                  v.nxt_plus    = 1'b0;
+                  v.nxt_minus   = 1'b0;
+                  v.nxt_pause_p = 1'b0;
+                  v.nxt_pause_n = 1'b1;
+                  `X_PAUSE(v);
+                  v.ws = WAITSTATES;
+                  v.update_outputs = 1'b1;
+                end
+                v.rx_state = ST_IDLE;
               end
-              v.rx_state = ST_IDLE;
-            end
-            3'h5: begin
-              v.rx_state = is_start ? ST_IDLE : ST_CMD_START;
-            end
-            3'h6: begin // ST_CMD_SHUTDOWN
-              v.start_state = START_IDLE;
-              v.timer       = {TIMER_WIDTH{1'b0}};
-              // O.ST в LOW, O.СH в LOW, O.BOT1-4 и O.TOP1-4 в LOW, O.FAN  в LOW
-              sendmsg("CMD_SHUTDOWN");
-              `X_PAUSE(v);
-              v.o_st         = 1'b0;
-              v.o_ch         = 1'b0;
-              v.o_fan        = 1'b0;
-              v.device_ready = 1'b0;
-              v.rx_state     = ST_IDLE;
-            end
-            3'h7: begin
-              v.rx_state = is_start ? ST_IDLE : ST_CMD_DISCHARGE0;
-            end
-            default: begin
-              sendmsg("CMD_UNKNOWN");
-              v.rx_state = ST_IDLE;
-            end
-          endcase // case (w_bus)
+              3'h5: begin
+                v.rx_state = is_start ? ST_IDLE : ST_CMD_START;
+              end
+              3'h6: begin // ST_CMD_SHUTDOWN
+                v.start_state = START_IDLE;
+                v.timer       = {TIMER_WIDTH{1'b0}};
+                // O.ST в LOW, O.СH в LOW, O.BOT1-4 и O.TOP1-4 в LOW, O.FAN  в LOW
+                sendmsg("CMD_SHUTDOWN");
+                `X_PAUSE(v);
+                v.o_st         = 1'b0;
+                v.o_ch         = 1'b0;
+                v.pwm_value    = {PWM_WIDTH{1'b0}};
+                v.o_fan        = 1'b0;
+                v.device_ready = 1'b0;
+                v.rx_state     = ST_IDLE;
+              end
+              3'h7: begin
+                v.rx_state = is_start ? ST_IDLE : ST_CMD_DISCHARGE0;
+              end
+              default: begin
+                sendmsg("CMD_UNKNOWN");
+                v.rx_state = ST_IDLE;
+              end
+            endcase // case (w_bus)
           end // if (~r.update_outputs)
         end // case: ST_IDLE
         ST_CMD_START: begin
@@ -365,8 +503,9 @@ end
             v.o_fan       = 1'b1;
             v.o_st        = 1'b0;
             v.o_ch        = 1'b1;
-            v.start_state = START_WAIT15S;
-            v.timer       = TIMEOUT_15S;
+            v.pwm_value   = PWM_1;
+            v.start_state = START_PWM_1;
+            v.timer       = TIMEOUT_1S;
           end
           v.rx_state    = ST_IDLE;
         end // case: ST_CMD_START
@@ -395,6 +534,7 @@ end
       v.o_top        = 4'b0000;
       v.o_st         = 1'b0;
       v.o_ch         = 1'b0;
+      v.pwm_value    = {PWM_WIDTH{1'b0}};
       v.o_break      = 1'b1;
       v.o_plus       = 1'b0;
       v.o_minus      = 1'b0;
@@ -460,7 +600,7 @@ end
   assign O_PAUSE_P = r.o_pause_p;
   assign O_PAUSE_N = r.o_pause_n;
   assign O_CHARGE  = r.o_ch;
-  assign O_CH      = r.o_ch;
+  assign O_CH      = r.o_ch & ((r.pwm_counter < r.pwm_value) | (&r.pwm_value == 1'b1));
 
   assign O_FAN     = r.o_fan;
   assign O_STOP    = r.o_stop;
