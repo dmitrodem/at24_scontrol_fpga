@@ -10,7 +10,7 @@ module top #(
   input wire  clk,        // E2
   input wire  rst,        // H11
   // input wire  uart_rx,    // B3
-  // output wire uart_tx,    // C3
+  output wire uart_tx,    // C3
   output wire led_ready,  // E8
   output wire led_done,   // D7
 
@@ -222,6 +222,7 @@ module top #(
   mailbox_t rmin;
   // synthesis translate_on
 
+  /* verilator lint_off MULTIDRIVEN */
   task sendmsg (input string msg);
     begin
       // synthesis translate_off
@@ -241,7 +242,7 @@ begin                      \
     v.o_pause_n = 1'b0;    \
 end
 
-  always @(*) begin
+  always_comb begin : x_comb
     automatic state_t v = r;
 
     automatic bit is_start;
@@ -631,6 +632,57 @@ end
     dbg_cnt <= dbg_cnt + 1;
   end
   assign led_done  = dbg_cnt[25];
+
+  typedef struct packed {
+    bit [15:0] prescaler;
+    bit [15:0] holdreg;
+    bit        tick;
+    bit [3:0]  state;
+    bit [1:0]  char_state;
+  } uart_t;
+
+  localparam uart_t RES_uart = '{
+    prescaler: 16'h0,
+    holdreg: {16{1'b1}},
+    tick: 1'b0,
+    state: 4'h0,
+    char_state: 2'h0
+  };
+
+  uart_t ru = RES_uart;
+  uart_t ru_in;
+
+  always_comb begin
+    automatic uart_t v = ru;
+    v.tick = 1'b0;
+    if (ru.prescaler > 0) begin
+      v.prescaler = ru.prescaler - 1;
+    end else begin
+      v.prescaler = 16'd433;
+      v.tick      = 1'b1;
+      v.state     = ru.state + 1;
+      if (ru.state == 0) begin
+        v.holdreg = {{7{1'b1}}, 8'haf, 1'b0};
+        case (ru.char_state)
+          2'b00: v.holdreg = {{7{1'b1}}, 8'h53, 1'b0};
+          2'b01: v.holdreg = {{7{1'b1}}, {4'h0, r.rx_state}, 1'b0};
+          2'b10: v.holdreg = {{7{1'b1}}, r.start_state, 1'b0};
+          2'b11: v.holdreg = {{7{1'b1}}, 8'h73, 1'b0};
+        endcase // case (r.char_state)
+        v.char_state = ru.char_state + 1;
+      end else begin
+        v.holdreg = {1'b1, ru.holdreg[15:1]};
+      end
+    end
+    ru_in = v;
+  end
+
+  always_ff @(posedge clk) begin
+    ru <= ru_in;
+  end
+
+  // wire uart_tx;
+  assign uart_tx = ru.holdreg[0];
 
 endmodule
 `default_nettype wire

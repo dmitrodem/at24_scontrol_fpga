@@ -1,7 +1,7 @@
 IO_LOC "clk"           E2;
 IO_LOC "rst"           H11;
 //IO_LOC "uart_rx"       B3;
-//IO_LOC "uart_tx"       C3;
+IO_LOC "uart_tx"       C3;
 IO_LOC "led_ready"     E8;
 IO_LOC "led_done"      D7;
 

@@ -28,7 +28,7 @@ module testbench;
   wire       O_STOP;
   wire       O_TD;
 
-  localparam FREQ = 500000;
+  localparam FREQ = 50000;
 
   top #(
     .FREQ(FREQ)
