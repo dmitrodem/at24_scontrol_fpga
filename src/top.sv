@@ -5,7 +5,7 @@
 module top #(
   parameter FREQ         = 50000000,
   parameter FILTER_WIDTH = 8,
-  parameter WAITSTATES   = 4
+  parameter WAITSTATES   = 50
 ) (
   input wire  clk,        // E2
   input wire  rst,        // H11
@@ -85,29 +85,31 @@ module top #(
 
   localparam     TIMEOUT_15S     = (FREQ * 15) - 1;
   localparam     TIMEOUT_1S      = (FREQ * 1) - 1;
+  localparam     TIMEOUT_2S      = (FREQ * 2) - 1;
   localparam     TIMER_WIDTH     = $clog2(TIMEOUT_15S + 1);
 
   localparam     LED_NORMAL      = (FREQ) - 1;
   localparam     LED_ERROR       = (FREQ/8) - 1;
   localparam     LED_TIMER_WIDTH = $clog2(LED_NORMAL + 1);
 
-  localparam     PWM_WIDTH       = 16;
-
-  localparam     PWM_1           = 5;
-  localparam     PWM_2           = 11;
-  localparam     PWM_3           = 23;
-  localparam     PWM_4           = 46;
-  localparam     PWM_5           = 90;
-  localparam     PWM_6           = 174;
-  localparam     PWM_7           = 338;
-  localparam     PWM_8           = 654;
-  localparam     PWM_9           = 1264;
-  localparam     PWM_10          = 2441;
-  localparam     PWM_11          = 4715;
-  localparam     PWM_12          = 9105;
-  localparam     PWM_13          = 17580;
-  localparam     PWM_14          = 33943;
-  localparam     PWM_15          = 65535;
+  localparam     PWM_WIDTH       = 19;
+  
+  localparam     PWM_ALL         = 262144;
+  localparam     PWM_1           = PWM_ALL/2; //5%
+  localparam     PWM_2           = PWM_ALL/2; //10%   
+  localparam     PWM_3           = PWM_ALL/2;
+  localparam     PWM_4           = PWM_ALL/2;
+  localparam     PWM_5           = PWM_ALL;
+  localparam     PWM_6           = PWM_ALL;
+  localparam     PWM_7           = PWM_ALL;
+  localparam     PWM_8           = PWM_ALL;
+  localparam     PWM_9           = PWM_ALL+PWM_ALL/2;
+  localparam     PWM_10          = PWM_ALL+PWM_ALL/2;
+  localparam     PWM_11          = PWM_ALL+PWM_ALL/2;
+  localparam     PWM_12          = PWM_ALL*2-1;
+  localparam     PWM_13          = PWM_ALL*2-1;
+  localparam     PWM_14          = PWM_ALL*2-1;
+  localparam     PWM_15          = PWM_ALL*2-1;
 
   typedef enum bit [7:0] {
     START_IDLE   = 0,
@@ -161,7 +163,7 @@ module top #(
     bit [TIMER_WIDTH-1:0] timer;
     bit [LED_TIMER_WIDTH-1:0] led_timer;
     bit                       led_ready;
-    bit [3:0]                 ws;
+    bit [11:0]                 ws;
     bit [4:1]                 nxt_top;
     bit [4:1]                 nxt_bot;
     bit                       nxt_plus;
@@ -196,7 +198,7 @@ module top #(
     timer: {TIMER_WIDTH{1'b0}},
     led_timer: {LED_TIMER_WIDTH{1'b0}},
     led_ready: 1'b0,
-    ws : 4'h0,
+    ws : 12'h0,
     nxt_top: 4'b0000,
     nxt_bot: 4'b0000,
     nxt_plus: 1'b0,
@@ -266,105 +268,105 @@ end
       START_PWM_1: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_2;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_2;
         end
       end
       START_PWM_2: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_3;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_3;
         end
       end
       START_PWM_3: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_4;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_4;
         end
       end
       START_PWM_4: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_5;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_5;
         end
       end
       START_PWM_5: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_6;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_6;
         end
       end
       START_PWM_6: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_7;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_7;
         end
       end
       START_PWM_7: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_8;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_8;
         end
       end
       START_PWM_8: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_9;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_9;
         end
       end
       START_PWM_9: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_10;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_10;
         end
       end
       START_PWM_10: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_11;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_11;
         end
       end
       START_PWM_11: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_12;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_12;
         end
       end
       START_PWM_12: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_13;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_13;
         end
       end
       START_PWM_13: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_14;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_14;
         end
       end
       START_PWM_14: begin
         if (|r.timer == 1'b0) begin
           v.pwm_value   = PWM_15;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_PWM_15;
         end
       end
       START_PWM_15: begin
         if (|r.timer == 1'b0) begin
           v.o_st        = 1'b1;
-          v.timer       = TIMEOUT_1S;
+          v.timer       = TIMEOUT_2S;
           v.start_state = START_WAIT1S;
         end
       end
@@ -502,7 +504,7 @@ end
             v.o_ch        = 1'b1;
             v.pwm_value   = PWM_1;
             v.start_state = START_PWM_1;
-            v.timer       = TIMEOUT_1S;
+            v.timer       = TIMEOUT_2S;
           end
           v.rx_state    = ST_IDLE;
         end // case: ST_CMD_START
