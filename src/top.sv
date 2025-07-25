@@ -93,10 +93,10 @@ module top #(
   localparam     LED_TIMER_WIDTH = $clog2(LED_NORMAL + 1);
 
   localparam     PWM_WIDTH       = 19;
-  
+
   localparam     PWM_ALL         = 262144;
   localparam     PWM_1           = PWM_ALL/2; //5%
-  localparam     PWM_2           = PWM_ALL/2; //10%   
+  localparam     PWM_2           = PWM_ALL/2; //10%
   localparam     PWM_3           = PWM_ALL/2;
   localparam     PWM_4           = PWM_ALL/2;
   localparam     PWM_5           = PWM_ALL;
@@ -541,6 +541,7 @@ end
       v.o_pause_n    = 1'b0;
       v.device_ready = 1'b0;
       v.rx_state     = ST_ERROR;
+      v.start_state  = ST_IDLE;
     end
 
     v.o_stop = w_stop_k ? 1'b1: r.o_stop;
