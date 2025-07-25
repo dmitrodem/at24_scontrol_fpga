@@ -1,4 +1,7 @@
 `default_nettype none
+
+`define SYNC_RESET
+
 module top #(
   parameter FREQ         = 50000000,
   parameter FILTER_WIDTH = 8,
@@ -251,13 +254,6 @@ end
     // synthesis translate_on
 
     v.pwm_counter = r.pwm_counter + 1;
-
-    if (|r.led_timer) begin
-      v.led_timer = r.led_timer - 1;
-    end else begin
-      v.led_ready = ~r.led_ready;
-      v.led_timer = (r.rx_state == ST_ERROR) ? LED_ERROR : LED_NORMAL;
-    end
 
     if (r.timer > 0) begin
       v.timer = r.timer - 1;
@@ -551,16 +547,36 @@ end
     for (int i = 1; i < 5; i = i + 1)
       v.o_erbd[i] = w_err_dr[i] ? 1'b1: r.o_erbd[i];
 
+`ifdef SYNC_RESET
+    if (~rstn) begin
+      v = RES_state;
+    end
+`endif                          // `SYNC_RESET
+
+    // led_timer работает без сброса
+    if (|r.led_timer) begin
+      v.led_timer = r.led_timer - 1;
+    end else begin
+      v.led_ready = ~r.led_ready;
+      v.led_timer = (r.rx_state == ST_ERROR) ? LED_ERROR : LED_NORMAL;
+    end
+
     rin = v;
   end
 
-  always_ff @(posedge clk or negedge rstn) begin
+`ifdef SYNC_RESET
+  always_ff @(posedge clk) begin : x_sync_reset
+      r <= rin;
+  end
+`else                           // ~`SYNC_RESET
+  always_ff @(posedge clk or negedge rstn) begin : x_async_reset
     if (~rstn) begin
       r <= RES_state;
     end else begin
       r <= rin;
     end
   end
+`endif                          // `SYNC_RESET
 
   // synthesis translate_off
   always_ff @(posedge clk or negedge rstn) begin
