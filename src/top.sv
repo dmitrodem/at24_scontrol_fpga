@@ -10,7 +10,7 @@ module top #(
   input wire  clk,        // E2
   input wire  rst,        // H11
   // input wire  uart_rx,    // B3
-  output wire uart_tx,    // C3
+  output wire uart_tx,    // C10
   output wire led_ready,  // E8
   output wire led_done,   // D7
 
