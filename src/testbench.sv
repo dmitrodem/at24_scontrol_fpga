@@ -28,6 +28,8 @@ module testbench;
   wire       O_STOP;
   wire       O_TD;
 
+  wire       uart_io;
+
   localparam FREQ = 50000;
 
   top #(
@@ -38,6 +40,8 @@ module testbench;
 
     .led_ready(),
     .led_done(),
+
+    .uart_tx(uart_io),
 
     // inputs
     .I_BT (I_BT),
@@ -80,6 +84,13 @@ module testbench;
     .O_TOP_3 (O_TOP[3]),
     .O_TOP_4 (O_TOP[4]),
     .O_TD (O_TD));
+
+  uart_receiver_hex_printer u1 (
+   .clk     (clk),     // System clock
+   .rst_n   (~rst),    // Active-low reset
+   .uart_rx (uart_io)  // UART receive line
+  );
+
 
   initial forever #(10ns) clk = ~clk;
   initial begin
@@ -183,7 +194,7 @@ module testbench;
 
     cmd_shutdown();
 
-    #(10us);
+    #(10ms);
     $stop();
   end
 
