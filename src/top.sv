@@ -541,7 +541,7 @@ end
       v.o_pause_n    = 1'b0;
       v.device_ready = 1'b0;
       v.rx_state     = ST_ERROR;
-      v.start_state  = ST_IDLE;
+      v.start_state  = START_IDLE;
     end
 
     v.o_stop = w_stop_k ? 1'b1: r.o_stop;
