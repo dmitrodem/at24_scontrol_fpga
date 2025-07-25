@@ -1,8 +1,8 @@
 `default_nettype none
 module uart_receiver_hex_printer (
-   input logic clk,    // System clock
-   input logic rst_n,  // Active-low reset
-   input logic uart_rx // UART receive line
+   input wire clk,    // System clock
+   input wire rst_n,  // Active-low reset
+   input wire uart_rx // UART receive line
 );
 
   // Parameters for 115200 baud at given clock frequency

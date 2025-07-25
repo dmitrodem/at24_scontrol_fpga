@@ -528,20 +528,10 @@ end
     // I.ERR_DR_1-4, I.ERR_U, I.ERR_I, I.BT, I.STOP_K
     if (|{w_err_dr[4:1], w_err_u, w_err_i, w_bt, w_stop_k}) begin
       // O.FAN в HIGH, O.BOT1-4 и O.TOP1-4 в LOW, O.ST в LOW, O.СH в LOW
-      v.o_fan        = 1'b1;
-      v.o_bot        = 4'b0000;
-      v.o_top        = 4'b0000;
-      v.o_st         = 1'b0;
-      v.o_ch         = 1'b0;
-      v.pwm_value    = {PWM_WIDTH{1'b0}};
-      v.o_break      = 1'b1;
-      v.o_plus       = 1'b0;
-      v.o_minus      = 1'b0;
-      v.o_pause_p    = 1'b0;
-      v.o_pause_n    = 1'b0;
-      v.device_ready = 1'b0;
-      v.rx_state     = ST_ERROR;
-      v.start_state  = START_IDLE;
+      v          = RES_state;
+      v.rx_state = ST_ERROR;
+      v.o_fan    = 1'b1;
+      v.o_break  = 1'b1;
     end
 
     v.o_stop = w_stop_k ? 1'b1: r.o_stop;
