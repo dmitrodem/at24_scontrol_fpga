@@ -70,10 +70,10 @@ module top #(
 
   assign rstn = ~rst;
 
-  filter #(.WIDTH(FILTER_WIDTH)) u_clk (.clk (clk), .rstn(rstn), .i(I_CLK), .o(w_clk));
-  filter #(.WIDTH(FILTER_WIDTH)) u_c0 (.clk (clk), .rstn(rstn), .i(I_C0), .o(w_bus[0]));
-  filter #(.WIDTH(FILTER_WIDTH)) u_c1 (.clk (clk), .rstn(rstn), .i(I_C1), .o(w_bus[1]));
-  filter #(.WIDTH(FILTER_WIDTH)) u_c2 (.clk (clk), .rstn(rstn), .i(I_C2), .o(w_bus[2]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_clk (.clk (clk), .rstn(rstn), .i(~I_CLK), .o(w_clk));
+  filter #(.WIDTH(FILTER_WIDTH)) u_c0 (.clk (clk), .rstn(rstn), .i(~I_C0), .o(w_bus[0]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_c1 (.clk (clk), .rstn(rstn), .i(~I_C1), .o(w_bus[1]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_c2 (.clk (clk), .rstn(rstn), .i(~I_C2), .o(w_bus[2]));
   filter #(.WIDTH(FILTER_WIDTH)) u_err_dr1 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_1), .o(w_err_dr[1]));
   filter #(.WIDTH(FILTER_WIDTH)) u_err_dr2 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_2), .o(w_err_dr[2]));
   filter #(.WIDTH(FILTER_WIDTH)) u_err_dr3 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_3), .o(w_err_dr[3]));
