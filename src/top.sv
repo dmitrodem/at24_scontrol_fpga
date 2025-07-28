@@ -163,7 +163,7 @@ module top #(
     bit [TIMER_WIDTH-1:0] timer;
     bit [LED_TIMER_WIDTH-1:0] led_timer;
     bit                       led_ready;
-    bit [11:0]                 ws;
+    bit [11:0]                ws;
     bit [4:1]                 nxt_top;
     bit [4:1]                 nxt_bot;
     bit                       nxt_plus;
@@ -631,7 +631,12 @@ end
     bit [15:0] holdreg;
     bit        tick;
     bit [3:0]  state;
-    bit [1:0]  char_state;
+    bit [5:0]  char_state;
+    state_t c;
+    bit [31:0] timer;
+    bit [31:0] led_timer;
+    bit [31:0] pwm_counter;
+    bit [31:0] pwm_value;
   } uart_t;
 
   localparam uart_t RES_uart = '{
@@ -639,7 +644,12 @@ end
     holdreg: {16{1'b1}},
     tick: 1'b0,
     state: 4'h0,
-    char_state: 2'h0
+    char_state: 6'h0,
+    c: RES_state,
+    timer: 32'h0,
+    led_timer: 32'h0,
+    pwm_counter: 32'h0,
+    pwm_value: 32'h0
   };
 
   uart_t ru = RES_uart;
@@ -649,20 +659,60 @@ end
     automatic uart_t v = ru;
     v.tick = 1'b0;
     if (ru.prescaler > 0) begin
-      v.prescaler = ru.prescaler - 1;
+      v.prescaler = ru.prescaler - 'd1;
     end else begin
       v.prescaler = 16'd433;
       v.tick      = 1'b1;
-      v.state     = ru.state + 1;
+      v.state     = ru.state + 'd1;
       if (ru.state == 0) begin
-        v.holdreg = {{7{1'b1}}, 8'haf, 1'b0};
         case (ru.char_state)
-          2'b00: v.holdreg = {{7{1'b1}}, 8'h53, 1'b0};
-          2'b01: v.holdreg = {{7{1'b1}}, {4'h0, r.rx_state}, 1'b0};
-          2'b10: v.holdreg = {{7{1'b1}}, r.start_state, 1'b0};
-          2'b11: v.holdreg = {{7{1'b1}}, 8'h73, 1'b0};
+          'h00: begin
+            v.holdreg     = {{7{1'b1}}, "S", 1'b0};
+            v.c           = r;
+            v.timer       = r.timer;
+            v.led_timer   = r.led_timer;
+            v.pwm_counter = r.pwm_counter;
+            v.pwm_value   = r.pwm_value;
+          end
+          'h01: v.holdreg = {{7{1'b1}}, {4'h0, ru.c.rx_state}, 1'b0};
+          'h02: v.holdreg = {{7{1'b1}}, {ru.c.start_state}, 1'b0};
+          'h03: v.holdreg = {{7{1'b1}}, {4'h0, ru.c.o_top}, 1'b0};
+          'h04: v.holdreg = {{7{1'b1}}, {4'h0, ru.c.o_bot}, 1'b0};
+          'h05: v.holdreg = {{7{1'b1}}, {1'b0, ru.c.o_st, ru.c.o_ch, ru.c.o_fan, ru.c.o_break, ru.c.o_avi, ru.c.o_avv, ru.c.o_td}, 1'b0};
+          'h06: v.holdreg = {{7{1'b1}}, {4'h0, ru.c.o_erbd}, 1'b0};
+          'h07: v.holdreg = {{7{1'b1}}, {4'b0, ru.c.o_plus, ru.c.o_minus, ru.c.o_pause_p, ru.c.o_pause_n}, 1'b0};
+          'h08: v.holdreg = {{7{1'b1}}, {7'b0, ru.c.o_stop}, 1'b0};
+          'h09: v.holdreg = {{7{1'b1}}, {ru.timer[31:24]}, 1'b0};
+          'h0a: v.holdreg = {{7{1'b1}}, {ru.timer[23:16]}, 1'b0};
+          'h0b: v.holdreg = {{7{1'b1}}, {ru.timer[15:8]}, 1'b0};
+          'h0c: v.holdreg = {{7{1'b1}}, {ru.timer[7:0]}, 1'b0};
+          'h0d: v.holdreg = {{7{1'b1}}, {ru.led_timer[31:24]}, 1'b0};
+          'h0e: v.holdreg = {{7{1'b1}}, {ru.led_timer[23:16]}, 1'b0};
+          'h0f: v.holdreg = {{7{1'b1}}, {ru.led_timer[15:8]}, 1'b0};
+          'h10: v.holdreg = {{7{1'b1}}, {ru.led_timer[7:0]}, 1'b0};
+          'h11: v.holdreg = {{7{1'b1}}, {7'b0, ru.c.led_ready}, 1'b0};
+          'h12: v.holdreg = {{7{1'b1}}, {4'b0, ru.c.ws[11:8]}, 1'b0};
+          'h13: v.holdreg = {{7{1'b1}}, {ru.c.ws[7:0]}, 1'b0};
+          'h14: v.holdreg = {{7{1'b1}}, {4'b0, ru.c.nxt_top}, 1'b0};
+          'h15: v.holdreg = {{7{1'b1}}, {4'b0, ru.c.nxt_bot}, 1'b0};
+          'h16: v.holdreg = {{7{1'b1}}, {4'b0, ru.c.nxt_plus, ru.c.nxt_minus, ru.c.nxt_pause_p, ru.c.nxt_pause_n}, 1'b0};
+          'h17: v.holdreg = {{7{1'b1}}, {6'b0, ru.c.update_outputs, ru.c.device_ready}, 1'b0};
+          'h18: v.holdreg = {{7{1'b1}}, {6'b0, ru.c.update_outputs, ru.c.device_ready}, 1'b0};
+          'h19: v.holdreg = {{7{1'b1}}, {ru.pwm_counter[31:24]}, 1'b0};
+          'h1a: v.holdreg = {{7{1'b1}}, {ru.pwm_counter[23:16]}, 1'b0};
+          'h1b: v.holdreg = {{7{1'b1}}, {ru.pwm_counter[15:8]}, 1'b0};
+          'h1c: v.holdreg = {{7{1'b1}}, {ru.pwm_counter[7:0]}, 1'b0};
+          'h1d: v.holdreg = {{7{1'b1}}, {ru.pwm_value[31:24]}, 1'b0};
+          'h1e: v.holdreg = {{7{1'b1}}, {ru.pwm_value[23:16]}, 1'b0};
+          'h1f: v.holdreg = {{7{1'b1}}, {ru.pwm_value[15:8]}, 1'b0};
+          'h20: v.holdreg = {{7{1'b1}}, {ru.pwm_value[7:0]}, 1'b0};
+          'h21: v.holdreg = {{7{1'b1}}, "s", 1'b0};
         endcase // case (r.char_state)
-        v.char_state = ru.char_state + 1;
+        if (ru.char_state == 'h21) begin
+          v.char_state = 'h0;
+        end else begin
+          v.char_state = ru.char_state + 'd1;
+        end
       end else begin
         v.holdreg = {1'b1, ru.holdreg[15:1]};
       end
