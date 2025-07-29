@@ -10,6 +10,7 @@ set_option -use_done_as_gpio 1
 set_option -use_i2c_as_gpio 1
 set_option -use_cpu_as_gpio 1
 
+add_file -type verilog [file normalize "src/pll.sv"]
 add_file -type verilog [file normalize "src/filter.sv"]
 add_file -type verilog [file normalize "src/top.sv"]
 add_file -type cst [file normalize "src/top.cst"]

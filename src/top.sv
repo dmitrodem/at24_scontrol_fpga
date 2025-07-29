@@ -59,6 +59,7 @@ module top #(
   input wire  I_C2        // Pin 39 (J10)
 );
 
+  wire lclk;
   wire rstn;
   wire w_clk;
   wire [2:0] w_bus;
@@ -68,20 +69,26 @@ module top #(
   wire       w_bt;
   wire       w_stop_k;
 
-  assign rstn = ~rst;
+  pll pll0 (
+    .clkin   (clk),
+    .reset   (1'b0),
+    .clkout  (lclk),
+    .locked  (rstn));
 
-  filter #(.WIDTH(FILTER_WIDTH)) u_clk (.clk (clk), .rstn(rstn), .i(~I_CLK), .o(w_clk));
-  filter #(.WIDTH(FILTER_WIDTH)) u_c0 (.clk (clk), .rstn(rstn), .i(~I_C0), .o(w_bus[0]));
-  filter #(.WIDTH(FILTER_WIDTH)) u_c1 (.clk (clk), .rstn(rstn), .i(~I_C1), .o(w_bus[1]));
-  filter #(.WIDTH(FILTER_WIDTH)) u_c2 (.clk (clk), .rstn(rstn), .i(~I_C2), .o(w_bus[2]));
-  filter #(.WIDTH(FILTER_WIDTH)) u_err_dr1 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_1), .o(w_err_dr[1]));
-  filter #(.WIDTH(FILTER_WIDTH)) u_err_dr2 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_2), .o(w_err_dr[2]));
-  filter #(.WIDTH(FILTER_WIDTH)) u_err_dr3 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_3), .o(w_err_dr[3]));
-  filter #(.WIDTH(FILTER_WIDTH)) u_err_dr4 (.clk (clk), .rstn(rstn), .i(~I_ERR_DR_4), .o(w_err_dr[4]));
-  filter #(.WIDTH(FILTER_WIDTH)) u_err_u (.clk (clk), .rstn(rstn), .i(~I_ERR_U), .o(w_err_u));
-  filter #(.WIDTH(FILTER_WIDTH)) u_err_i (.clk (clk), .rstn(rstn), .i(~I_ERR_I), .o(w_err_i));
-  filter #(.WIDTH(FILTER_WIDTH)) u_bt (.clk (clk), .rstn(rstn), .i(I_BT), .o(w_bt));
-  filter #(.WIDTH(FILTER_WIDTH)) u_stop_k (.clk (clk), .rstn(rstn), .i(~I_STOP_K), .o(w_stop_k));
+  // assign rstn = ~rst;
+
+  filter #(.WIDTH(FILTER_WIDTH)) u_clk (.clk (lclk), .rstn(rstn), .i(~I_CLK), .o(w_clk));
+  filter #(.WIDTH(FILTER_WIDTH)) u_c0 (.clk (lclk), .rstn(rstn), .i(~I_C0), .o(w_bus[0]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_c1 (.clk (lclk), .rstn(rstn), .i(~I_C1), .o(w_bus[1]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_c2 (.clk (lclk), .rstn(rstn), .i(~I_C2), .o(w_bus[2]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_err_dr1 (.clk (lclk), .rstn(rstn), .i(~I_ERR_DR_1), .o(w_err_dr[1]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_err_dr2 (.clk (lclk), .rstn(rstn), .i(~I_ERR_DR_2), .o(w_err_dr[2]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_err_dr3 (.clk (lclk), .rstn(rstn), .i(~I_ERR_DR_3), .o(w_err_dr[3]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_err_dr4 (.clk (lclk), .rstn(rstn), .i(~I_ERR_DR_4), .o(w_err_dr[4]));
+  filter #(.WIDTH(FILTER_WIDTH)) u_err_u (.clk (lclk), .rstn(rstn), .i(~I_ERR_U), .o(w_err_u));
+  filter #(.WIDTH(FILTER_WIDTH)) u_err_i (.clk (lclk), .rstn(rstn), .i(~I_ERR_I), .o(w_err_i));
+  filter #(.WIDTH(FILTER_WIDTH)) u_bt (.clk (lclk), .rstn(rstn), .i(I_BT), .o(w_bt));
+  filter #(.WIDTH(FILTER_WIDTH)) u_stop_k (.clk (lclk), .rstn(rstn), .i(~I_STOP_K), .o(w_stop_k));
 
   localparam     TIMEOUT_15S     = (FREQ * 15) - 1;
   localparam     TIMEOUT_1S      = (FREQ * 1) - 1;
@@ -559,11 +566,11 @@ end
   end
 
 `ifdef SYNC_RESET
-  always_ff @(posedge clk) begin : x_sync_reset
+  always_ff @(posedge lclk) begin : x_sync_reset
       r <= rin;
   end
 `else                           // ~`SYNC_RESET
-  always_ff @(posedge clk or negedge rstn) begin : x_async_reset
+  always_ff @(posedge lclk or negedge rstn) begin : x_async_reset
     if (~rstn) begin
       r <= RES_state;
     end else begin
@@ -573,7 +580,7 @@ end
 `endif                          // `SYNC_RESET
 
   // synthesis translate_off
-  always_ff @(posedge clk or negedge rstn) begin
+  always_ff @(posedge lclk or negedge rstn) begin
     if (~rstn) begin
       rm.msg <= "";
       rm.send <= 1'b0;
@@ -621,7 +628,7 @@ end
 
 
   reg [25:0] dbg_cnt;
-  always @(posedge clk) begin : dbg_led
+  always @(posedge lclk) begin : dbg_led
     dbg_cnt <= dbg_cnt + 1;
   end
   assign led_done  = dbg_cnt[25];
@@ -720,7 +727,7 @@ end
     ru_in = v;
   end
 
-  always_ff @(posedge clk) begin
+  always_ff @(posedge lclk) begin
     ru <= ru_in;
   end
 
